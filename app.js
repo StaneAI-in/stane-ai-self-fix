@@ -6,6 +6,9 @@
   var STORAGE_KEY = 'stane-selffix-v1';
   var DB_NAME = 'stane-selffix-videos';
   var DB_STORE = 'videos';
+  // Optional sync: tasks, streaks and notes (never videos) are kept in one file in a private repo.
+  var SYNC_KEY = 'stane-selffix-sync';
+  var SYNC_API = 'https://api.github.com/repos/divyanshu7588/stane-ai-self-fix-data/contents/data.json';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -15,8 +18,10 @@
   var el = {
     notice: $('notice'), todayLine: $('todayLine'),
     statCrossed: $('statCrossed'), statFixed: $('statFixed'), statEnglish: $('statEnglish'),
-    tabBtnCalendar: $('tabBtnCalendar'), tabBtnEnglish: $('tabBtnEnglish'),
-    tabCalendar: $('tabCalendar'), tabEnglish: $('tabEnglish'),
+    tabBtnCalendar: $('tabBtnCalendar'), tabBtnEnglish: $('tabBtnEnglish'), tabBtnSync: $('tabBtnSync'),
+    tabCalendar: $('tabCalendar'), tabEnglish: $('tabEnglish'), tabSync: $('tabSync'),
+    syncChip: $('syncChip'), syncStatus: $('syncStatus'), syncForm: $('syncForm'), syncToken: $('syncToken'),
+    syncNow: $('syncNow'), syncOff: $('syncOff'),
     monthTitle: $('monthTitle'), grid: $('grid'), prev: $('prev'), next: $('next'), goToday: $('goToday'),
     dayTitle: $('dayTitle'), crossBtn: $('crossBtn'), crossHint: $('crossHint'),
     progressBar: $('progressBar'), progressText: $('progressText'),
@@ -70,33 +75,44 @@
 
   function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 
-  function load() {
-    var data = { tasks: {}, crossed: {}, fixed: [], fixedDone: {}, english: {} };
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (isObj(parsed)) {
-          if (isObj(parsed.tasks)) data.tasks = parsed.tasks;
-          if (isObj(parsed.crossed)) data.crossed = parsed.crossed;
-          if (Array.isArray(parsed.fixed)) data.fixed = parsed.fixed;
-          if (isObj(parsed.fixedDone)) data.fixedDone = parsed.fixedDone;
-          if (isObj(parsed.english)) data.english = parsed.english;
-        }
-      }
-    } catch (e) {
-      showNotice('Saved data could not be read in this browser. Changes may not be kept.');
+  function normalize(parsed) {
+    var data = { tasks: {}, crossed: {}, fixed: [], fixedDone: {}, english: {}, stamps: {} };
+    if (isObj(parsed)) {
+      if (isObj(parsed.tasks)) data.tasks = parsed.tasks;
+      if (isObj(parsed.crossed)) data.crossed = parsed.crossed;
+      if (Array.isArray(parsed.fixed)) data.fixed = parsed.fixed;
+      if (isObj(parsed.fixedDone)) data.fixedDone = parsed.fixedDone;
+      if (isObj(parsed.english)) data.english = parsed.english;
+      if (isObj(parsed.stamps)) data.stamps = parsed.stamps;
     }
     return data;
   }
 
-  function save() {
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return normalize(JSON.parse(raw));
+    } catch (e) {
+      showNotice('Saved data could not be read in this browser. Changes may not be kept.');
+    }
+    return normalize(null);
+  }
+
+  function saveLocal() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       showNotice('This browser is blocking storage, so changes will be lost when the page closes.');
     }
   }
+
+  function save() {
+    saveLocal();
+    scheduleSync();
+  }
+
+  // Records when one item last changed, so two devices can be merged item by item.
+  function stamp(key) { state.stamps[key] = Date.now(); }
 
   var dbPromise = null;
   function openDb() {
@@ -492,18 +508,215 @@
   }
 
   function showTab(name) {
-    var isCal = name === 'calendar';
-    el.tabCalendar.hidden = !isCal;
-    el.tabEnglish.hidden = isCal;
-    el.tabBtnCalendar.classList.toggle('active', isCal);
-    el.tabBtnEnglish.classList.toggle('active', !isCal);
-    el.tabBtnCalendar.setAttribute('aria-selected', String(isCal));
-    el.tabBtnEnglish.setAttribute('aria-selected', String(!isCal));
+    [['calendar', el.tabCalendar, el.tabBtnCalendar],
+     ['english', el.tabEnglish, el.tabBtnEnglish],
+     ['sync', el.tabSync, el.tabBtnSync]].forEach(function (t) {
+      var on = t[0] === name;
+      t[1].hidden = !on;
+      t[2].classList.toggle('active', on);
+      t[2].setAttribute('aria-selected', String(on));
+    });
   }
+
+  /* ---------------- sync ---------------- */
+  // Every changeable item becomes one "atom" with its own key, so two copies can be merged item by item.
+  function atoms(s) {
+    var m = {};
+    Object.keys(s.crossed).forEach(function (d) { if (s.crossed[d]) m['c:' + d] = true; });
+    Object.keys(s.fixedDone).forEach(function (d) {
+      Object.keys(s.fixedDone[d] || {}).forEach(function (id) {
+        if (s.fixedDone[d][id]) m['fd:' + d + ':' + id] = true;
+      });
+    });
+    Object.keys(s.tasks).forEach(function (d) {
+      (s.tasks[d] || []).forEach(function (t) { m['t:' + d + ':' + t.id] = t; });
+    });
+    s.fixed.forEach(function (f) { m['f:' + f.id] = f; });
+    Object.keys(s.english).forEach(function (d) { m['e:' + d] = s.english[d]; });
+    return m;
+  }
+
+  function build(m, stamps) {
+    var s = normalize(null);
+    Object.keys(m).sort().forEach(function (key) {
+      var v = m[key];
+      if (v === undefined || v === null) return;
+      var p = key.split(':');
+      if (p[0] === 'c') s.crossed[p[1]] = true;
+      else if (p[0] === 'fd') { if (!s.fixedDone[p[1]]) s.fixedDone[p[1]] = {}; s.fixedDone[p[1]][p[2]] = true; }
+      else if (p[0] === 't') { if (!s.tasks[p[1]]) s.tasks[p[1]] = []; s.tasks[p[1]].push(v); }
+      else if (p[0] === 'f') s.fixed.push(v);
+      else if (p[0] === 'e') s.english[p[1]] = v;
+    });
+    // Drop ticks that belong to a fixed task that no longer exists.
+    var alive = {};
+    s.fixed.forEach(function (f) { alive[f.id] = true; });
+    Object.keys(s.fixedDone).forEach(function (d) {
+      Object.keys(s.fixedDone[d]).forEach(function (id) { if (!alive[id]) delete s.fixedDone[d][id]; });
+      if (!Object.keys(s.fixedDone[d]).length) delete s.fixedDone[d];
+    });
+    Object.keys(stamps).sort().forEach(function (k) { s.stamps[k] = stamps[k]; });
+    return s;
+  }
+
+  // For each item, the copy that changed most recently wins (a newer delete also wins).
+  function merge(local, remote) {
+    var la = atoms(local), ra = atoms(remote), ls = local.stamps, rs = remote.stamps;
+    var keys = {}, out = {}, st = {};
+    [la, ra, ls, rs].forEach(function (o) { Object.keys(o).forEach(function (k) { keys[k] = true; }); });
+    Object.keys(keys).forEach(function (k) {
+      var a = Number(ls[k]) || 0, b = Number(rs[k]) || 0;
+      if (b > a) { out[k] = ra[k]; st[k] = b; }
+      else if (a > b) { out[k] = la[k]; st[k] = a; }
+      else { out[k] = la[k] !== undefined ? la[k] : ra[k]; if (a) st[k] = a; }
+    });
+    return build(out, st);
+  }
+
+  function stable(v) {
+    if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+    if (v && typeof v === 'object') {
+      return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + stable(v[k]); }).join(',') + '}';
+    }
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  function canon(s) { return stable(build(atoms(s), s.stamps)); }
+
+  function b64encode(text) {
+    var bytes = new TextEncoder().encode(text), bin = '';
+    for (var i = 0; i < bytes.length; i += 8192) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    return btoa(bin);
+  }
+  function b64decode(b64) {
+    var bin = atob(b64.replace(/\s/g, ''));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  var sync = { token: '', busy: false, again: false, timer: null };
+  try { sync.token = (JSON.parse(localStorage.getItem(SYNC_KEY) || '{}').token) || ''; } catch (e) { sync.token = ''; }
+
+  function setSyncStatus(kind, text) {
+    el.syncChip.textContent = kind === 'off' ? 'Sync off' : kind === 'busy' ? 'Syncing…' : kind === 'ok' ? 'Synced' : 'Sync problem';
+    el.syncChip.className = 'sync-chip ' + kind;
+    el.syncStatus.textContent = text;
+    el.syncStatus.className = 'sync-status ' + kind;
+    el.syncNow.hidden = !sync.token;
+    el.syncOff.hidden = !sync.token;
+  }
+
+  function ghFetch(method, body, raw) {
+    return fetch(SYNC_API, {
+      method: method,
+      cache: 'no-store',
+      headers: {
+        'Accept': raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
+        'Authorization': 'Bearer ' + sync.token
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  }
+
+  function syncError(status) {
+    if (status === 401) return new Error('GitHub rejected the token. It may be wrong or expired. Paste a new one.');
+    if (status === 403) return new Error('GitHub refused access. The token may lack "Contents: Read and write" permission.');
+    if (status === 404) return new Error('The token cannot reach the data repository. Check that it has access to stane-ai-self-fix-data.');
+    return new Error('GitHub returned an error (' + status + '). It will be tried again.');
+  }
+
+  async function syncOnce() {
+    var res = await ghFetch('GET');
+    var remote = null, sha;
+    if (res.status === 200) {
+      var info = await res.json();
+      sha = info.sha;
+      var text;
+      if (info.content) text = b64decode(info.content);
+      else {
+        var rawRes = await ghFetch('GET', null, true);
+        if (!rawRes.ok) throw syncError(rawRes.status);
+        text = await rawRes.text();
+      }
+      try { remote = normalize(JSON.parse(text)); }
+      catch (e) { throw new Error('The synced data file is damaged and could not be read.'); }
+    } else if (res.status !== 404) {
+      throw syncError(res.status);
+    }
+
+    var merged = remote ? merge(state, remote) : build(atoms(state), state.stamps);
+    var mergedCanon = stable(merged);
+    if (mergedCanon !== canon(state)) {
+      state = merged;
+      saveLocal();
+      render();
+    }
+    if (remote && canon(remote) === mergedCanon) return true;
+
+    var body = { message: 'Sync data', content: b64encode(JSON.stringify(merged)) };
+    if (sha) body.sha = sha;
+    var put = await ghFetch('PUT', body);
+    if (put.ok) return true;
+    if (put.status === 409 || put.status === 422) return false; // the other device saved first; merge again
+    throw syncError(put.status);
+  }
+
+  async function syncNow() {
+    if (!sync.token) { setSyncStatus('off', 'Sync is off on this device. Data stays only in this browser.'); return; }
+    if (sync.busy) { sync.again = true; return; }
+    sync.busy = true;
+    setSyncStatus('busy', 'Syncing…');
+    try {
+      var done = false;
+      for (var i = 0; i < 4 && !done; i++) done = await syncOnce();
+      if (!done) throw new Error('Both devices were saving at the same time. It will be tried again.');
+      var t = new Date();
+      setSyncStatus('ok', 'Synced at ' + formatTime(pad(t.getHours()) + ':' + pad(t.getMinutes())) + '. Videos are not synced.');
+    } catch (e) {
+      var offline = e instanceof TypeError;
+      setSyncStatus('error', offline ? 'Could not reach GitHub. Check the internet connection; it will be tried again.' : e.message);
+    }
+    sync.busy = false;
+    if (sync.again) { sync.again = false; scheduleSync(); }
+  }
+
+  function scheduleSync() {
+    if (!sync.token) return;
+    clearTimeout(sync.timer);
+    sync.timer = setTimeout(syncNow, 1500);
+  }
+
+  el.syncForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var token = el.syncToken.value.trim();
+    if (!token) return;
+    sync.token = token;
+    el.syncToken.value = '';
+    try { localStorage.setItem(SYNC_KEY, JSON.stringify({ token: token })); }
+    catch (err) { showNotice('This browser is blocking storage, so the token will be forgotten when the page closes.'); }
+    syncNow();
+  });
+  el.syncNow.addEventListener('click', syncNow);
+  el.syncOff.addEventListener('click', function () {
+    sync.token = '';
+    clearTimeout(sync.timer);
+    try { localStorage.removeItem(SYNC_KEY); } catch (err) { /* nothing to remove */ }
+    setSyncStatus('off', 'Sync is off on this device. Data stays only in this browser.');
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') syncNow();
+  });
+  window.addEventListener('online', syncNow);
+  setInterval(function () {
+    if (document.visibilityState === 'visible') syncNow();
+  }, 120000);
 
   /* ---------------- events: tabs + calendar ---------------- */
   el.tabBtnCalendar.addEventListener('click', function () { showTab('calendar'); });
   el.tabBtnEnglish.addEventListener('click', function () { showTab('english'); });
+  el.tabBtnSync.addEventListener('click', function () { showTab('sync'); });
 
   function shiftMonth(delta) {
     viewMonth += delta;
@@ -536,6 +749,7 @@
       if (selected > today) return;
       state.crossed[selected] = true;
     }
+    stamp('c:' + selected);
     save();
     render();
   });
@@ -546,10 +760,12 @@
     var text = el.fixedInput.value.trim();
     if (!text) return;
     // A fixed task starts from the day it is added on (never later than today).
+    var fixedId = newId();
     state.fixed.push({
-      id: newId(), text: text, time: el.fixedTime.value || '',
+      id: fixedId, text: text, time: el.fixedTime.value || '',
       created: selected < today ? selected : today
     });
+    stamp('f:' + fixedId);
     el.fixedInput.value = '';
     el.fixedTime.value = '';
     save();
@@ -568,6 +784,7 @@
       delete state.fixedDone[selected][id];
       if (!Object.keys(state.fixedDone[selected]).length) delete state.fixedDone[selected];
     }
+    stamp('fd:' + selected + ':' + id);
     save();
     render();
   });
@@ -582,6 +799,7 @@
         delete state.fixedDone[k][id];
         if (!Object.keys(state.fixedDone[k]).length) delete state.fixedDone[k];
       });
+      stamp('f:' + id);
       save();
       render();
     });
@@ -593,7 +811,9 @@
     var text = el.taskInput.value.trim();
     if (!text) return;
     if (!state.tasks[selected]) state.tasks[selected] = [];
-    state.tasks[selected].push({ id: newId(), text: text, time: el.taskTime.value || '', done: false });
+    var taskId = newId();
+    state.tasks[selected].push({ id: taskId, text: text, time: el.taskTime.value || '', done: false });
+    stamp('t:' + selected + ':' + taskId);
     el.taskInput.value = '';
     el.taskTime.value = '';
     save();
@@ -607,6 +827,7 @@
     tasksFor(selected).forEach(function (t) {
       if (t.id === id) t.done = e.target.checked;
     });
+    stamp('t:' + selected + ':' + id);
     save();
     render();
   });
@@ -619,6 +840,7 @@
       var remaining = tasksFor(selected).filter(function (t) { return t.id !== id; });
       if (remaining.length) state.tasks[selected] = remaining;
       else delete state.tasks[selected];
+      stamp('t:' + selected + ':' + id);
       save();
       render();
     });
@@ -644,6 +866,7 @@
     if (!file) {
       if (!state.english[key]) { setVideoMsg('Choose a video file first.', 'error'); return; }
       state.english[key].notes = notes;
+      stamp('e:' + key);
       save();
       render();
       setVideoMsg('Notes saved.', 'ok');
@@ -660,6 +883,7 @@
     readDuration(file).then(function (duration) {
       return putVideo(key, file).then(function () {
         state.english[key] = { notes: notes, name: file.name, size: file.size, duration: duration };
+        stamp('e:' + key);
         save();
         el.videoFile.value = '';
         render();
@@ -682,7 +906,10 @@
       var existing = li.querySelector('video');
       if (existing) { existing.play(); return; }
       getVideo(key).then(function (blob) {
-        if (!blob) { setVideoMsg('The video file for ' + shortDate(key) + ' is missing from this browser.', 'error'); return; }
+        if (!blob) {
+          setVideoMsg('The video for ' + shortDate(key) + ' is not on this device. Videos stay only on the device where they were uploaded.', 'error');
+          return;
+        }
         // Only one video is loaded at a time.
         var old = el.history.querySelector('video');
         if (old) old.remove();
@@ -711,6 +938,7 @@
       armOrRun(del, function () {
         deleteVideo(key).catch(function () {}).then(function () {
           delete state.english[key];
+          stamp('e:' + key);
           save();
           render();
         });
@@ -732,4 +960,5 @@
   el.videoDate.max = today;
   fillVideoFormFor(today);
   render();
+  syncNow();
 })();

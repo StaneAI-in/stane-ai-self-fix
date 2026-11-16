@@ -27,6 +27,8 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="true" class="tab active">Calendar</button>
     <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
+    <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
+    <span class="sync-chip off" id="syncChip">Sync off</span>
   </nav>
 
   <p class="notice" id="notice" hidden></p>
@@ -111,6 +113,37 @@
       <h2>History</h2>
       <ul class="history" id="history"></ul>
       <p class="empty" id="historyEmpty">No videos yet. Your first upload will appear here.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Sync tab ===================== -->
+  <main class="layout" id="tabSync" role="tabpanel" aria-labelledby="tabBtnSync" hidden>
+    <section class="card" aria-label="Sync between devices">
+      <h2>Sync phone and laptop</h2>
+      <p class="sync-status off" id="syncStatus" role="status"></p>
+      <p class="hint">Tasks, fixed tasks, streaks, crossed days and English notes are synced through your private GitHub repository. Videos are never uploaded; each video stays only on the device where you added it.</p>
+      <form id="syncForm" class="video-form" autocomplete="off">
+        <label>GitHub access token for this device
+          <input type="password" id="syncToken" autocomplete="off" spellcheck="false" placeholder="Paste the token here">
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn">Connect</button>
+          <button type="button" class="ghost-btn" id="syncNow" hidden>Sync now</button>
+          <button type="button" class="ghost-btn" id="syncOff" hidden>Turn off on this device</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-label="How to create the token">
+      <h2>How to get the token</h2>
+      <ol class="steps">
+        <li>Open GitHub and sign in to your personal account.</li>
+        <li>Go to Settings, then Developer settings, then Personal access tokens, then Fine-grained tokens, and choose Generate new token.</li>
+        <li>Under Repository access choose "Only select repositories" and pick <strong>stane-ai-self-fix-data</strong>.</li>
+        <li>Under Permissions, Repository permissions, set <strong>Contents</strong> to "Read and write". Leave everything else as it is.</li>
+        <li>Generate the token, copy it, and paste it on this page. Do the same on your phone.</li>
+      </ol>
+      <p class="hint">The token is saved only in this browser. When it expires, sync stops until you paste a new one; your data on this device is not affected.</p>
     </section>
   </main>
 
