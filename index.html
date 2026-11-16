@@ -5,23 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>Stane AI SELF-FIX</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="top">
-    <h1>Stane AI SELF-FIX</h1>
-    <p class="summary" id="summary"></p>
+    <div class="brand">
+      <img src="logo.svg" alt="" width="44" height="44">
+      <div>
+        <h1>Stane AI SELF-FIX</h1>
+        <p class="tagline" id="todayLine"></p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-num" id="statCrossed">0</span><span class="stat-label">days crossed this month</span></div>
+      <div class="stat"><span class="stat-num" id="statFixed">0</span><span class="stat-label">best fixed-task streak</span></div>
+      <div class="stat"><span class="stat-num" id="statEnglish">0</span><span class="stat-label">English video streak</span></div>
+    </div>
   </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="true" class="tab active">Calendar</button>
+    <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
+  </nav>
 
   <p class="notice" id="notice" hidden></p>
 
-  <main class="layout">
-    <section class="calendar" aria-label="Calendar">
+  <!-- ===================== Calendar tab ===================== -->
+  <main class="layout" id="tabCalendar" role="tabpanel" aria-labelledby="tabBtnCalendar">
+    <section class="card calendar" aria-label="Calendar">
       <div class="cal-head">
         <button type="button" class="nav" id="prev" aria-label="Previous month">&#8249;</button>
         <h2 id="monthTitle"></h2>
         <button type="button" class="nav" id="next" aria-label="Next month">&#8250;</button>
-        <button type="button" class="today-btn" id="goToday">Today</button>
+        <button type="button" class="ghost-btn" id="goToday">Today</button>
       </div>
       <div class="weekdays" aria-hidden="true">
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -29,20 +46,71 @@
       <div class="grid" id="grid"></div>
     </section>
 
-    <section class="day" aria-label="Tasks for the selected day">
+    <section class="card day" aria-label="Tasks for the selected day">
       <div class="day-head">
         <h2 id="dayTitle"></h2>
         <button type="button" class="cross-btn" id="crossBtn"></button>
       </div>
       <p class="hint" id="crossHint"></p>
+      <div class="progress" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+      <p class="progress-text" id="progressText"></p>
 
-      <form class="add" id="addForm" autocomplete="off">
-        <input type="text" id="taskInput" maxlength="200" placeholder="Add a task for this day" aria-label="New task">
+      <h3>Fixed daily tasks</h3>
+      <ul class="tasks" id="fixedList"></ul>
+      <p class="empty" id="fixedEmpty">No fixed tasks yet. Add the things you want to do every day.</p>
+      <form class="add" id="fixedForm" autocomplete="off">
+        <input type="text" id="fixedInput" maxlength="200" placeholder="New fixed task (every day)" aria-label="New fixed daily task">
+        <input type="time" id="fixedTime" aria-label="Time for the fixed task (optional)">
         <button type="submit">Add</button>
       </form>
 
+      <h3>Tasks for this day</h3>
       <ul class="tasks" id="taskList"></ul>
       <p class="empty" id="empty">No tasks for this day yet.</p>
+      <form class="add" id="addForm" autocomplete="off">
+        <input type="text" id="taskInput" maxlength="200" placeholder="New task for this day" aria-label="New task for this day">
+        <input type="time" id="taskTime" aria-label="Time for the task (optional)">
+        <button type="submit">Add</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ===================== English tab ===================== -->
+  <main class="layout" id="tabEnglish" role="tabpanel" aria-labelledby="tabBtnEnglish" hidden>
+    <div class="col">
+      <section class="card focus" aria-label="What to improve today">
+        <h2>Improve today</h2>
+        <p class="focus-from" id="focusFrom"></p>
+        <p class="focus-text" id="focusText"></p>
+        <p class="status" id="todayStatus"></p>
+      </section>
+
+      <section class="card" aria-label="Upload a video">
+        <h2>Upload your speaking video</h2>
+        <p class="hint">Speak for about 3 minutes, upload the video, then write what you should improve next time.</p>
+        <form id="videoForm" class="video-form">
+          <label>Date
+            <input type="date" id="videoDate" required>
+          </label>
+          <label>Video file
+            <input type="file" id="videoFile" accept="video/*">
+          </label>
+          <label>What to improve next time
+            <textarea id="videoNotes" rows="4" maxlength="2000" placeholder="e.g. Speak slower. Stop saying 'basically'. Finish sentences."></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn" id="videoSave">Save</button>
+            <span class="form-msg" id="videoMsg" role="status"></span>
+          </div>
+        </form>
+        <p class="hint" id="storageLine"></p>
+      </section>
+    </div>
+
+    <section class="card" aria-label="Video history">
+      <h2>History</h2>
+      <ul class="history" id="history"></ul>
+      <p class="empty" id="historyEmpty">No videos yet. Your first upload will appear here.</p>
     </section>
   </main>
 
