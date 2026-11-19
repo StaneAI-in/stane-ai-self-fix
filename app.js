@@ -512,6 +512,7 @@
      ['english', el.tabEnglish, el.tabBtnEnglish],
      ['team', $('tabTeam'), $('tabBtnTeam')],
      ['ideas', $('tabIdeas'), $('tabBtnIdeas')],
+     ['expenses', $('tabExpenses'), $('tabBtnExpenses')],
      ['sync', el.tabSync, el.tabBtnSync]].forEach(function (t) {
       var on = t[0] === name;
       t[1].hidden = !on;
@@ -721,6 +722,7 @@
   el.tabBtnSync.addEventListener('click', function () { showTab('sync'); });
   $('tabBtnTeam').addEventListener('click', function () { showTab('team'); });
   $('tabBtnIdeas').addEventListener('click', function () { showTab('ideas'); });
+  $('tabBtnExpenses').addEventListener('click', function () { showTab('expenses'); });
 
   function shiftMonth(delta) {
     viewMonth += delta;

@@ -7,6 +7,7 @@
   <title>Stane AI SELF-FIX</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
+  <script src="team-key.js"></script>
   <script src="auth.js"></script>
 </head>
 <body>
@@ -30,6 +31,7 @@
     <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
     <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="false" class="tab">Team</button>
     <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
+    <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
     <span class="sync-chip off" id="syncChip">Sync off</span>
   </nav>
@@ -122,8 +124,20 @@
   <!-- ===================== Team tab (admin) ===================== -->
   <main class="layout" id="tabTeam" role="tabpanel" aria-labelledby="tabBtnTeam" hidden>
     <div class="col">
+      <section class="card" aria-label="Tasks assigned to you">
+        <div class="card-head">
+          <h2>Assigned to you</h2>
+          <span class="count-pill"><strong id="tmMinePending">0</strong> pending</span>
+        </div>
+        <ul class="tasks" id="tmMineList"></ul>
+        <p class="empty" id="tmMineEmpty">Nothing to do right now.</p>
+        <h3>Done</h3>
+        <ul class="tasks" id="tmMineDoneList"></ul>
+        <p class="empty" id="tmMineDoneEmpty">Nothing finished yet.</p>
+      </section>
+
       <section class="card" aria-label="Assign a task">
-        <h2>Assign a task to your partner</h2>
+        <h2 id="tmAssignHead">Assign a task</h2>
         <form id="tmAssignForm" class="video-form" autocomplete="off">
           <label>Task
             <input type="text" id="tmAssignText" maxlength="200" placeholder="e.g. Finish the landing page copy" required>
@@ -145,35 +159,27 @@
         </form>
       </section>
 
-      <section class="card" aria-label="Assigned tasks">
-        <div class="team-stats">
-          <div class="stat"><span class="stat-num" id="tmPendingCount">0</span><span class="stat-label">pending</span></div>
-          <div class="stat"><span class="stat-num" id="tmDoneCount">0</span><span class="stat-label">done</span></div>
+      <section class="card" aria-label="Tasks you assigned">
+        <div class="card-head">
+          <h2 id="tmSentHead">Assigned by you</h2>
+          <span class="count-pill"><strong id="tmSentPending">0</strong> pending</span>
         </div>
-        <h3>Pending</h3>
-        <ul class="tasks" id="tmTaskList"></ul>
-        <p class="empty" id="tmTaskEmpty">No pending tasks.</p>
+        <ul class="tasks" id="tmSentList"></ul>
+        <p class="empty" id="tmSentEmpty">No pending tasks.</p>
         <h3>Done</h3>
-        <ul class="tasks" id="tmDoneList"></ul>
-        <p class="empty" id="tmDoneEmpty">Nothing finished yet.</p>
+        <ul class="tasks" id="tmSentDoneList"></ul>
+        <p class="empty" id="tmSentDoneEmpty">Nothing finished yet.</p>
       </section>
     </div>
 
     <div class="col">
-      <section class="card" aria-label="Team connection">
-        <h2>Team connection</h2>
+      <section class="card" aria-label="Team sync">
+        <h2>Team sync</h2>
         <p class="sync-status off" id="tmStatus" role="status"></p>
-        <p class="hint" id="tmTokenHint"></p>
-        <form id="tmForm" class="video-form" autocomplete="off">
-          <label>Team token for this device (optional)
-            <input type="password" id="tmToken" autocomplete="off" spellcheck="false" placeholder="Paste a token with access to stane-ai-team-data">
-          </label>
-          <div class="form-row">
-            <button type="submit" class="primary-btn">Connect</button>
-            <button type="button" class="ghost-btn" id="tmSyncNow" hidden>Sync now</button>
-            <button type="button" class="ghost-btn" id="tmSyncOff" hidden>Disconnect</button>
-          </div>
-        </form>
+        <p class="hint">Tasks, ideas and expenses sync automatically for both of you after signing in.</p>
+        <div class="form-row">
+          <button type="button" class="ghost-btn" id="tmSyncNow" hidden>Sync now</button>
+        </div>
       </section>
 
       <section class="card" aria-label="Names">
@@ -192,17 +198,6 @@
             <span class="form-msg" id="tmNamesMsg" role="status"></span>
           </div>
         </form>
-      </section>
-
-      <section class="card" aria-label="How to give your partner access">
-        <h2>Give your partner access</h2>
-        <ol class="steps">
-          <li>On GitHub, create a <strong>private</strong> repository named <strong>stane-ai-team-data</strong>.</li>
-          <li>Edit your own sync token and add <strong>stane-ai-team-data</strong> to its repositories, so your Team and Ideas tabs work.</li>
-          <li>Create a second fine-grained token with access to <strong>only stane-ai-team-data</strong>, Contents set to "Read and write". This one is for your partner; it cannot see your personal calendar or English data.</li>
-          <li>Send your partner that token privately, along with the link to <strong>team.html</strong> on this site.</li>
-          <li>They open the link, paste the token, and see only the tasks you assign and the shared Ideas board.</li>
-        </ol>
       </section>
     </div>
   </main>
@@ -229,6 +224,69 @@
         <p class="empty" id="tmIdeaEmptyMember">No ideas yet.</p>
       </section>
     </div>
+  </main>
+
+  <!-- ===================== Expenses ===================== -->
+  <main class="layout exp-layout" id="tabExpenses" role="tabpanel" aria-labelledby="tabBtnExpenses" hidden>
+    <div class="col">
+      <section class="card balance-card" aria-label="Balance">
+        <p class="balance-label">Balance between you two</p>
+        <p class="balance-amount" id="tmExpBalance">All settled</p>
+        <p class="hint" id="tmExpBalanceSub"></p>
+      </section>
+
+      <section class="card" aria-label="Add an expense">
+        <h2>Add an expense</h2>
+        <form id="tmExpForm" class="video-form" autocomplete="off">
+          <div class="field-row">
+            <label>Amount (₹)
+              <input type="number" id="tmExpAmount" min="0.01" step="0.01" inputmode="decimal" placeholder="0" required>
+            </label>
+            <label>Date
+              <input type="date" id="tmExpDate" required>
+            </label>
+          </div>
+          <label>What for
+            <input type="text" id="tmExpWhat" maxlength="120" placeholder="e.g. Domain renewal, lunch, ads" required>
+          </label>
+          <div class="field-row">
+            <label>Paid by
+              <select id="tmExpPaidBy">
+                <option value="admin">Divyanshu</option>
+                <option value="member">Mohit</option>
+              </select>
+            </label>
+            <label>How to split
+              <select id="tmExpSplit">
+                <option value="half">Split equally</option>
+                <option value="payer">Only for the payer (personal)</option>
+                <option value="other">Fully for the other person</option>
+                <option value="settle">Paying back money owed</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Add expense</button>
+            <span class="form-msg" id="tmExpMsg" role="status"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <section class="card" aria-label="Expenses by month">
+      <div class="cal-head">
+        <button type="button" class="nav" id="tmExpPrev" aria-label="Previous month">&#8249;</button>
+        <h2 id="tmExpMonthTitle"></h2>
+        <button type="button" class="nav" id="tmExpNext" aria-label="Next month">&#8250;</button>
+      </div>
+      <div class="team-stats">
+        <div class="stat"><span class="stat-num" id="tmExpTotal">₹0</span><span class="stat-label">spent this month</span></div>
+        <div class="stat"><span class="stat-num" id="tmExpPaidAdmin">₹0</span><span class="stat-label" id="tmExpPaidAdminLabel">paid by Divyanshu</span></div>
+        <div class="stat"><span class="stat-num" id="tmExpPaidMember">₹0</span><span class="stat-label" id="tmExpPaidMemberLabel">paid by Mohit</span></div>
+      </div>
+      <ul class="tasks exp-list" id="tmExpList"></ul>
+      <p class="empty" id="tmExpEmpty">No expenses this month.</p>
+    </section>
   </main>
 
   <!-- ===================== Sync tab ===================== -->

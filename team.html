@@ -7,6 +7,7 @@
   <title>Stane AI Team</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
+  <script src="team-key.js"></script>
   <script src="auth.js"></script>
 </head>
 <body data-role="member">
@@ -18,31 +19,66 @@
         <p class="tagline" id="tmHello"></p>
       </div>
     </div>
-    <div class="stats">
-      <div class="stat"><span class="stat-num" id="tmPendingCount">0</span><span class="stat-label">pending</span></div>
-      <div class="stat"><span class="stat-num" id="tmDoneCount">0</span><span class="stat-label">done</span></div>
-    </div>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">My tasks</button>
+    <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">Tasks</button>
     <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
-    <button type="button" role="tab" data-tab="tabConnect" aria-controls="tabConnect" aria-selected="false" class="tab">Connect</button>
+    <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <span class="sync-chip off" id="tmChip">Not connected</span>
   </nav>
 
   <!-- ===================== Tasks ===================== -->
-  <main class="layout single" id="tabTasks" role="tabpanel">
-    <section class="card" aria-label="Tasks assigned to you">
-      <h2>Tasks assigned to you</h2>
-      <p class="hint">Tick a task when you finish it. It is updated for both of you.</p>
-      <h3>To do</h3>
-      <ul class="tasks" id="tmTaskList"></ul>
-      <p class="empty" id="tmTaskEmpty">Nothing to do right now.</p>
-      <h3>Done</h3>
-      <ul class="tasks" id="tmDoneList"></ul>
-      <p class="empty" id="tmDoneEmpty">Nothing finished yet.</p>
-    </section>
+  <main class="layout" id="tabTasks" role="tabpanel">
+    <div class="col">
+      <section class="card" aria-label="Tasks assigned to you">
+        <div class="card-head">
+          <h2>Assigned to you</h2>
+          <span class="count-pill"><strong id="tmMinePending">0</strong> pending</span>
+        </div>
+        <ul class="tasks" id="tmMineList"></ul>
+        <p class="empty" id="tmMineEmpty">Nothing to do right now.</p>
+        <h3>Done</h3>
+        <ul class="tasks" id="tmMineDoneList"></ul>
+        <p class="empty" id="tmMineDoneEmpty">Nothing finished yet.</p>
+      </section>
+    </div>
+    <div class="col">
+      <section class="card" aria-label="Assign a task">
+        <h2 id="tmAssignHead">Assign a task</h2>
+        <form id="tmAssignForm" class="video-form" autocomplete="off">
+          <label>Task
+            <input type="text" id="tmAssignText" maxlength="200" placeholder="e.g. Finish the landing page copy" required>
+          </label>
+          <div class="field-row">
+            <label>Due date (optional)
+              <input type="date" id="tmAssignDue">
+            </label>
+            <label>Time (optional)
+              <input type="time" id="tmAssignTime">
+            </label>
+          </div>
+          <label>Details (optional)
+            <textarea id="tmAssignNote" rows="2" maxlength="1000" placeholder="Anything they should know"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Assign</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-label="Tasks you assigned">
+        <div class="card-head">
+          <h2 id="tmSentHead">Assigned by you</h2>
+          <span class="count-pill"><strong id="tmSentPending">0</strong> pending</span>
+        </div>
+        <ul class="tasks" id="tmSentList"></ul>
+        <p class="empty" id="tmSentEmpty">No pending tasks.</p>
+        <h3>Done</h3>
+        <ul class="tasks" id="tmSentDoneList"></ul>
+        <p class="empty" id="tmSentDoneEmpty">Nothing finished yet.</p>
+      </section>
+    </div>
   </main>
 
   <!-- ===================== Ideas ===================== -->
@@ -65,35 +101,66 @@
     </div>
   </main>
 
-  <!-- ===================== Connect ===================== -->
-  <main class="layout" id="tabConnect" role="tabpanel" hidden>
-    <section class="card" aria-label="Connect">
-      <h2>Connect this device</h2>
-      <p class="sync-status off" id="tmStatus" role="status"></p>
-      <form id="tmForm" class="video-form" autocomplete="off">
-        <label>Team token
-          <input type="password" id="tmToken" autocomplete="off" spellcheck="false" placeholder="Paste the token you were given">
-        </label>
-        <div class="form-row">
-          <button type="submit" class="primary-btn">Connect</button>
-          <button type="button" class="ghost-btn" id="tmSyncNow" hidden>Sync now</button>
-          <button type="button" class="ghost-btn" id="tmSyncOff" hidden>Disconnect</button>
-        </div>
-      </form>
-      <p class="hint">The token is saved only in this browser. Ask for a new one if it stops working.</p>
-    </section>
+  <!-- ===================== Expenses ===================== -->
+  <main class="layout exp-layout" id="tabExpenses" role="tabpanel" hidden>
+    <div class="col">
+      <section class="card balance-card" aria-label="Balance">
+        <p class="balance-label">Balance between you two</p>
+        <p class="balance-amount" id="tmExpBalance">All settled</p>
+        <p class="hint" id="tmExpBalanceSub"></p>
+      </section>
 
-    <section class="card" aria-label="Your name">
-      <h2>Your name</h2>
-      <form id="tmNamesForm" class="video-form" autocomplete="off">
-        <label>Name shown on the Ideas board
-          <input type="text" id="tmNameMember" maxlength="40" placeholder="Partner">
-        </label>
-        <div class="form-row">
-          <button type="submit" class="primary-btn">Save</button>
-          <span class="form-msg" id="tmNamesMsg" role="status"></span>
-        </div>
-      </form>
+      <section class="card" aria-label="Add an expense">
+        <h2>Add an expense</h2>
+        <form id="tmExpForm" class="video-form" autocomplete="off">
+          <div class="field-row">
+            <label>Amount (₹)
+              <input type="number" id="tmExpAmount" min="0.01" step="0.01" inputmode="decimal" placeholder="0" required>
+            </label>
+            <label>Date
+              <input type="date" id="tmExpDate" required>
+            </label>
+          </div>
+          <label>What for
+            <input type="text" id="tmExpWhat" maxlength="120" placeholder="e.g. Domain renewal, lunch, ads" required>
+          </label>
+          <div class="field-row">
+            <label>Paid by
+              <select id="tmExpPaidBy">
+                <option value="admin">Divyanshu</option>
+                <option value="member">Mohit</option>
+              </select>
+            </label>
+            <label>How to split
+              <select id="tmExpSplit">
+                <option value="half">Split equally</option>
+                <option value="payer">Only for the payer (personal)</option>
+                <option value="other">Fully for the other person</option>
+                <option value="settle">Paying back money owed</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Add expense</button>
+            <span class="form-msg" id="tmExpMsg" role="status"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <section class="card" aria-label="Expenses by month">
+      <div class="cal-head">
+        <button type="button" class="nav" id="tmExpPrev" aria-label="Previous month">&#8249;</button>
+        <h2 id="tmExpMonthTitle"></h2>
+        <button type="button" class="nav" id="tmExpNext" aria-label="Next month">&#8250;</button>
+      </div>
+      <div class="team-stats">
+        <div class="stat"><span class="stat-num" id="tmExpTotal">₹0</span><span class="stat-label">spent this month</span></div>
+        <div class="stat"><span class="stat-num" id="tmExpPaidAdmin">₹0</span><span class="stat-label" id="tmExpPaidAdminLabel">paid by Divyanshu</span></div>
+        <div class="stat"><span class="stat-num" id="tmExpPaidMember">₹0</span><span class="stat-label" id="tmExpPaidMemberLabel">paid by Mohit</span></div>
+      </div>
+      <ul class="tasks exp-list" id="tmExpList"></ul>
+      <p class="empty" id="tmExpEmpty">No expenses this month.</p>
     </section>
   </main>
 
@@ -109,10 +176,6 @@
         });
       }
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
-      // First visit with no token: open Connect.
-      var saved = {};
-      try { saved = JSON.parse(localStorage.getItem('stane-team-sync') || '{}') || {}; } catch (e) { saved = {}; }
-      if (!saved.token) show('tabConnect');
     })();
   </script>
   <script src="team.js"></script>

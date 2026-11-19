@@ -1,10 +1,12 @@
 (function () {
   'use strict';
 
-  // Shared team space: tasks the admin assigns to the partner, and ideas from both people.
-  // Used by index.html (admin) and team.html (partner). Data lives in team.json in a
-  // separate private repo, so the partner's token never reaches the admin's personal data.
-  var ROLE = document.body.dataset.role === 'member' ? 'member' : 'admin';
+  // Shared team space for two people: tasks either person assigns to the other,
+  // an ideas board and a shared expense tracker. Used by index.html (admin) and
+  // team.html (partner). Data lives in team.json in a separate private repo, so the
+  // partner's token never reaches the admin's personal data.
+  var user = window.STANE_USER;
+  var ROLE = user ? user.role : (document.body.dataset.role === 'member' ? 'member' : 'admin');
   var OTHER = ROLE === 'admin' ? 'member' : 'admin';
   var LOCAL_KEY = 'stane-team-v1';
   var TOKEN_KEY = 'stane-team-sync';
@@ -12,13 +14,17 @@
   var API = 'https://api.github.com/repos/divyanshu7588/stane-ai-team-data/contents/team.json';
   var DEFAULT_NAMES = { admin: 'Divyanshu', member: 'Mohit' };
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December'];
 
   function $(id) { return document.getElementById(id); }
   var el = {
     chip: $('tmChip'), status: $('tmStatus'), form: $('tmForm'), token: $('tmToken'),
     syncNow: $('tmSyncNow'), syncOff: $('tmSyncOff'), tokenHint: $('tmTokenHint'),
-    taskList: $('tmTaskList'), taskEmpty: $('tmTaskEmpty'), doneList: $('tmDoneList'), doneEmpty: $('tmDoneEmpty'),
-    pendingCount: $('tmPendingCount'), doneCount: $('tmDoneCount'), hello: $('tmHello'),
+    mine: $('tmMineList'), mineEmpty: $('tmMineEmpty'), mineDone: $('tmMineDoneList'), mineDoneEmpty: $('tmMineDoneEmpty'),
+    sent: $('tmSentList'), sentEmpty: $('tmSentEmpty'), sentDone: $('tmSentDoneList'), sentDoneEmpty: $('tmSentDoneEmpty'),
+    minePending: $('tmMinePending'), sentPending: $('tmSentPending'), hello: $('tmHello'),
+    assignHead: $('tmAssignHead'), sentHead: $('tmSentHead'),
     assignForm: $('tmAssignForm'), assignText: $('tmAssignText'), assignDue: $('tmAssignDue'),
     assignTime: $('tmAssignTime'), assignNote: $('tmAssignNote'),
     namesForm: $('tmNamesForm'), nameAdmin: $('tmNameAdmin'), nameMember: $('tmNameMember'), namesMsg: $('tmNamesMsg'),
@@ -26,9 +32,16 @@
     ideaHead: { admin: $('tmIdeaHeadAdmin'), member: $('tmIdeaHeadMember') },
     ideaEmpty: { admin: $('tmIdeaEmptyAdmin'), member: $('tmIdeaEmptyMember') },
     ideaForm: { admin: $('tmIdeaFormAdmin'), member: $('tmIdeaFormMember') },
-    ideaInput: { admin: $('tmIdeaInputAdmin'), member: $('tmIdeaInputMember') }
+    ideaInput: { admin: $('tmIdeaInputAdmin'), member: $('tmIdeaInputMember') },
+    expForm: $('tmExpForm'), expAmount: $('tmExpAmount'), expWhat: $('tmExpWhat'), expDate: $('tmExpDate'),
+    expPaidBy: $('tmExpPaidBy'), expSplit: $('tmExpSplit'), expMsg: $('tmExpMsg'),
+    expBalance: $('tmExpBalance'), expBalanceSub: $('tmExpBalanceSub'), expMonth: $('tmExpMonth'),
+    expMonthTitle: $('tmExpMonthTitle'), expPrev: $('tmExpPrev'), expNext: $('tmExpNext'),
+    expTotal: $('tmExpTotal'), expPaidAdmin: $('tmExpPaidAdmin'), expPaidMember: $('tmExpPaidMember'),
+    expPaidAdminLabel: $('tmExpPaidAdminLabel'), expPaidMemberLabel: $('tmExpPaidMemberLabel'),
+    expList: $('tmExpList'), expEmpty: $('tmExpEmpty')
   };
-  if (!el.taskList) return;
+  if (!el.mine) return;
 
   /* ---------------- helpers ---------------- */
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -48,6 +61,11 @@
     var d = new Date(ms);
     return d.getDate() + ' ' + MONTHS[d.getMonth()] + ', ' + formatTime(pad(d.getHours()) + ':' + pad(d.getMinutes()));
   }
+  // Amounts are stored in paise (whole numbers) so totals never drift.
+  function money(paise) {
+    var r = Math.abs(paise) / 100;
+    return '₹' + r.toLocaleString('en-IN', { minimumFractionDigits: r % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  }
   function nameOf(who) { return state.names[who] || DEFAULT_NAMES[who]; }
   function armOrRun(btn, run) {
     if (btn.classList.contains('armed')) { run(); return; }
@@ -58,13 +76,15 @@
       if (btn.isConnected) { btn.classList.remove('armed'); btn.textContent = original; }
     }, 3000);
   }
+  // Tasks made before two-way assigning existed were always admin -> partner.
+  function fromOf(t) { return t.from || 'admin'; }
+  function toOf(t) { return t.to || 'member'; }
 
   /* ---------------- state ---------------- */
+  var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'stamps'];
   function normalize(p) {
-    var s = { names: {}, tasks: {}, done: {}, ideas: {}, stamps: {} };
-    if (isObj(p)) {
-      ['names', 'tasks', 'done', 'ideas', 'stamps'].forEach(function (k) { if (isObj(p[k])) s[k] = p[k]; });
-    }
+    var s = {};
+    PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
     return s;
   }
   function load() {
@@ -77,12 +97,13 @@
   function save() { saveLocal(); scheduleSync(); }
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
+  var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses' };
   function atoms(s) {
     var m = {};
-    Object.keys(s.names).forEach(function (k) { if (s.names[k]) m['n:' + k] = s.names[k]; });
-    Object.keys(s.tasks).forEach(function (id) { m['t:' + id] = s.tasks[id]; });
-    Object.keys(s.done).forEach(function (id) { if (s.done[id]) m['d:' + id] = s.done[id]; });
-    Object.keys(s.ideas).forEach(function (id) { m['i:' + id] = s.ideas[id]; });
+    Object.keys(PREFIX).forEach(function (p) {
+      var part = s[PREFIX[p]];
+      Object.keys(part).forEach(function (id) { if (part[id]) m[p + ':' + id] = part[id]; });
+    });
     return m;
   }
   function build(m, stamps) {
@@ -90,11 +111,8 @@
     Object.keys(m).sort().forEach(function (key) {
       var v = m[key];
       if (v === undefined || v === null) return;
-      var i = key.indexOf(':'), kind = key.slice(0, i), id = key.slice(i + 1);
-      if (kind === 'n') s.names[id] = v;
-      else if (kind === 't') s.tasks[id] = v;
-      else if (kind === 'd') s.done[id] = v;
-      else if (kind === 'i') s.ideas[id] = v;
+      var i = key.indexOf(':'), part = PREFIX[key.slice(0, i)];
+      if (part) s[part][key.slice(i + 1)] = v;
     });
     Object.keys(s.done).forEach(function (id) { if (!s.tasks[id]) delete s.done[id]; });
     Object.keys(stamps).sort().forEach(function (k) { s.stamps[k] = stamps[k]; });
@@ -122,7 +140,7 @@
   function canon(s) { return stable(build(atoms(s), s.stamps)); }
 
   /* ---------------- render: tasks ---------------- */
-  function taskRow(id, t, doneAt) {
+  function taskRow(id, t, doneAt, mine) {
     var li = document.createElement('li');
     li.className = 'team-task' + (doneAt ? ' done' : '');
     li.dataset.id = id;
@@ -155,7 +173,8 @@
       meta.appendChild(tm);
     }
     var info = document.createElement('span');
-    info.textContent = doneAt ? 'Done ' + shortStamp(doneAt) : 'Assigned ' + shortStamp(t.created);
+    info.textContent = (mine ? 'From ' + nameOf(fromOf(t)) + ' · ' : 'To ' + nameOf(toOf(t)) + ' · ') +
+      (doneAt ? 'Done ' + shortStamp(doneAt) : 'Assigned ' + shortStamp(t.created));
     meta.appendChild(info);
     body.appendChild(meta);
 
@@ -167,7 +186,7 @@
     }
     li.appendChild(body);
 
-    if (ROLE === 'admin') {
+    if (fromOf(t) === ROLE || ROLE === 'admin') {
       var del = document.createElement('button');
       del.type = 'button';
       del.className = 'del';
@@ -178,25 +197,37 @@
     return li;
   }
 
+  function fillList(list, empty, ids, isDone, mine) {
+    if (!list) return;
+    list.textContent = '';
+    ids.forEach(function (id) { list.appendChild(taskRow(id, state.tasks[id], isDone ? state.done[id] : 0, mine)); });
+    if (empty) empty.hidden = ids.length > 0;
+  }
+
   function renderTasks() {
-    var ids = Object.keys(state.tasks);
-    var pending = ids.filter(function (id) { return !state.done[id]; }).sort(function (a, b) {
+    function byDue(a, b) {
       var x = state.tasks[a], y = state.tasks[b];
       var dx = (x.due || '9999') + (x.time || '99'), dy = (y.due || '9999') + (y.time || '99');
       return dx < dy ? -1 : dx > dy ? 1 : x.created - y.created;
-    });
-    var done = ids.filter(function (id) { return state.done[id]; })
-      .sort(function (a, b) { return state.done[b] - state.done[a]; });
+    }
+    function byDone(a, b) { return state.done[b] - state.done[a]; }
+    var ids = Object.keys(state.tasks);
+    var toMe = ids.filter(function (id) { return toOf(state.tasks[id]) === ROLE; });
+    var byMe = ids.filter(function (id) { return fromOf(state.tasks[id]) === ROLE && toOf(state.tasks[id]) !== ROLE; });
+    function open(id) { return !state.done[id]; }
+    function closed(id) { return !!state.done[id]; }
 
-    el.taskList.textContent = '';
-    pending.forEach(function (id) { el.taskList.appendChild(taskRow(id, state.tasks[id], 0)); });
-    el.taskEmpty.hidden = pending.length > 0;
-    el.doneList.textContent = '';
-    done.forEach(function (id) { el.doneList.appendChild(taskRow(id, state.tasks[id], state.done[id])); });
-    el.doneEmpty.hidden = done.length > 0;
+    var minePending = toMe.filter(open).sort(byDue);
+    var sentPending = byMe.filter(open).sort(byDue);
+    fillList(el.mine, el.mineEmpty, minePending, false, true);
+    fillList(el.mineDone, el.mineDoneEmpty, toMe.filter(closed).sort(byDone), true, true);
+    fillList(el.sent, el.sentEmpty, sentPending, false, false);
+    fillList(el.sentDone, el.sentDoneEmpty, byMe.filter(closed).sort(byDone), true, false);
 
-    if (el.pendingCount) el.pendingCount.textContent = pending.length;
-    if (el.doneCount) el.doneCount.textContent = done.length;
+    if (el.minePending) el.minePending.textContent = minePending.length;
+    if (el.sentPending) el.sentPending.textContent = sentPending.length;
+    if (el.assignHead) el.assignHead.textContent = 'Assign a task to ' + nameOf(OTHER);
+    if (el.sentHead) el.sentHead.textContent = 'Assigned by you to ' + nameOf(OTHER);
   }
 
   /* ---------------- render: ideas ---------------- */
@@ -237,14 +268,116 @@
     });
   }
 
+  /* ---------------- render: expenses ---------------- */
+  // How much of an expense the payer covered for the other person.
+  function owedToPayer(x) {
+    if (x.split === 'payer') return 0;
+    if (x.split === 'other' || x.split === 'settle') return x.amount;
+    return Math.round(x.amount / 2);
+  }
+  function splitLabel(x) {
+    var other = x.paidBy === 'admin' ? 'member' : 'admin';
+    if (x.split === 'payer') return 'Only for ' + nameOf(x.paidBy);
+    if (x.split === 'other') return 'Fully for ' + nameOf(other);
+    if (x.split === 'settle') return 'Paid back to ' + nameOf(other);
+    return 'Split equally';
+  }
+
+  var expView = todayKey().slice(0, 7);
+
+  function renderExpenses() {
+    if (!el.expList) return;
+    if (el.expPaidBy) {
+      el.expPaidBy.options[0].textContent = nameOf('admin') + (ROLE === 'admin' ? ' (you)' : '');
+      el.expPaidBy.options[1].textContent = nameOf('member') + (ROLE === 'member' ? ' (you)' : '');
+    }
+    if (el.expSplit) {
+      var payer = el.expPaidBy ? el.expPaidBy.value : ROLE;
+      el.expSplit.options[1].textContent = 'Only for ' + nameOf(payer) + ' (personal)';
+      var payee = nameOf(payer === 'admin' ? 'member' : 'admin');
+      el.expSplit.options[2].textContent = 'Fully for ' + payee;
+      el.expSplit.options[3].textContent = 'Paying back money owed to ' + payee;
+    }
+
+    var ids = Object.keys(state.expenses);
+    // All-time balance: positive means the partner owes the admin.
+    var net = 0;
+    ids.forEach(function (id) {
+      var x = state.expenses[id];
+      var o = owedToPayer(x);
+      net += x.paidBy === 'admin' ? o : -o;
+    });
+    if (!net) {
+      el.expBalance.textContent = 'All settled';
+      el.expBalanceSub.textContent = 'Nobody owes anything right now.';
+    } else {
+      var debtor = net > 0 ? 'member' : 'admin', creditor = net > 0 ? 'admin' : 'member';
+      el.expBalance.textContent = (debtor === ROLE ? 'You owe ' : nameOf(debtor) + ' owes ') +
+        (creditor === ROLE ? 'you ' : nameOf(creditor) + ' ') + money(net);
+      el.expBalanceSub.textContent = 'When the money is returned, add it with "Paying back".';
+    }
+
+    var p = expView.split('-');
+    el.expMonthTitle.textContent = LONG_MONTHS[Number(p[1]) - 1] + ' ' + p[0];
+    var monthIds = ids.filter(function (id) { return (state.expenses[id].date || '').slice(0, 7) === expView; })
+      .sort(function (a, b) {
+        var x = state.expenses[a], y = state.expenses[b];
+        return x.date < y.date ? 1 : x.date > y.date ? -1 : y.created - x.created;
+      });
+    var total = 0, paid = { admin: 0, member: 0 };
+    monthIds.forEach(function (id) {
+      var x = state.expenses[id];
+      if (x.split === 'settle') return; // repayments are not spending
+      total += x.amount;
+      paid[x.paidBy] += x.amount;
+    });
+    el.expTotal.textContent = money(total);
+    el.expPaidAdmin.textContent = money(paid.admin);
+    el.expPaidMember.textContent = money(paid.member);
+    el.expPaidAdminLabel.textContent = 'paid by ' + nameOf('admin');
+    el.expPaidMemberLabel.textContent = 'paid by ' + nameOf('member');
+
+    el.expList.textContent = '';
+    monthIds.forEach(function (id) {
+      var x = state.expenses[id];
+      var li = document.createElement('li');
+      li.dataset.id = id;
+      var body = document.createElement('div');
+      body.className = 'team-body';
+      var what = document.createElement('span');
+      what.className = 'text';
+      what.textContent = x.what;
+      var meta = document.createElement('div');
+      meta.className = 'team-meta';
+      meta.textContent = shortKey(x.date) + ' · Paid by ' + nameOf(x.paidBy) + ' · ' + splitLabel(x);
+      body.appendChild(what);
+      body.appendChild(meta);
+      var amt = document.createElement('span');
+      amt.className = 'exp-amount ' + x.paidBy;
+      amt.textContent = money(x.amount);
+      li.appendChild(body);
+      li.appendChild(amt);
+      if (x.by === ROLE || ROLE === 'admin') {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'del';
+        del.textContent = '✕';
+        del.setAttribute('aria-label', 'Delete expense: ' + x.what);
+        li.appendChild(del);
+      }
+      el.expList.appendChild(li);
+    });
+    el.expEmpty.hidden = monthIds.length > 0;
+  }
+
   function renderNames() {
-    if (el.hello) el.hello.textContent = 'Hi ' + nameOf(ROLE) + '. Tasks from ' + nameOf('admin') + ' show up here.';
+    if (el.hello) el.hello.textContent = 'Hi ' + nameOf(ROLE) + '. Your tasks, ideas and shared expenses.';
     var active = document.activeElement;
     if (el.nameAdmin && active !== el.nameAdmin) el.nameAdmin.value = state.names.admin || '';
     if (el.nameMember && active !== el.nameMember) el.nameMember.value = state.names.member || '';
   }
 
-  function render() { renderTasks(); renderIdeas(); renderNames(); }
+  function render() { renderTasks(); renderIdeas(); renderExpenses(); renderNames(); }
 
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
@@ -343,7 +476,7 @@
   }
 
   async function syncNow() {
-    if (!sync.token) { setStatus('off', 'Not connected. Paste the team token below to see shared tasks and ideas.'); return; }
+    if (!sync.token) { setStatus('off', 'Sync is not switched on yet. Changes stay on this device until it is.'); return; }
     if (sync.busy) { sync.again = true; return; }
     sync.busy = true;
     setStatus('busy', 'Syncing…');
@@ -391,7 +524,7 @@
   window.addEventListener('online', syncNow);
   setInterval(function () { if (document.visibilityState === 'visible') syncNow(); }, 60000);
 
-  /* ---------------- events ---------------- */
+  /* ---------------- events: tasks ---------------- */
   function onTaskToggle(e) {
     if (e.target.type !== 'checkbox') return;
     var id = e.target.closest('li').dataset.id;
@@ -403,9 +536,11 @@
   }
   function onTaskClick(e) {
     var del = e.target.closest('.del');
-    if (!del || ROLE !== 'admin') return;
+    if (!del) return;
+    var id = del.closest('li').dataset.id;
+    var t = state.tasks[id];
+    if (!t || (fromOf(t) !== ROLE && ROLE !== 'admin')) return;
     armOrRun(del, function () {
-      var id = del.closest('li').dataset.id;
       delete state.tasks[id];
       delete state.done[id];
       stamp('t:' + id);
@@ -414,12 +549,13 @@
       render();
     });
   }
-  [el.taskList, el.doneList].forEach(function (list) {
+  [el.mine, el.mineDone, el.sent, el.sentDone].forEach(function (list) {
+    if (!list) return;
     list.addEventListener('change', onTaskToggle);
     list.addEventListener('click', onTaskClick);
   });
 
-  if (el.assignForm && ROLE === 'admin') {
+  if (el.assignForm) {
     el.assignForm.addEventListener('submit', function (e) {
       e.preventDefault();
       var text = el.assignText.value.trim();
@@ -430,6 +566,8 @@
         due: el.assignDue.value || '',
         time: el.assignTime.value || '',
         note: el.assignNote.value.trim(),
+        from: ROLE,
+        to: OTHER,
         created: Date.now()
       };
       stamp('t:' + id);
@@ -460,6 +598,7 @@
     });
   }
 
+  /* ---------------- events: ideas ---------------- */
   ['admin', 'member'].forEach(function (who) {
     var form = el.ideaForm[who];
     if (form && who === ROLE) {
@@ -474,6 +613,9 @@
         save();
         render();
         el.ideaInput[who].focus();
+      });
+      el.ideaInput[who].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
       });
     }
     if (el.ideas[who]) {
@@ -493,14 +635,64 @@
     }
   });
 
-  // Ctrl/Cmd+Enter adds an idea from the textarea.
-  ['admin', 'member'].forEach(function (who) {
-    var input = el.ideaInput[who];
-    if (!input) return;
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); el.ideaForm[who].requestSubmit(); }
+  /* ---------------- events: expenses ---------------- */
+  function setExpMsg(text, kind) {
+    if (!el.expMsg) return;
+    el.expMsg.textContent = text;
+    el.expMsg.className = 'form-msg' + (kind ? ' ' + kind : '');
+  }
+  function shiftExpMonth(delta) {
+    var p = expView.split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+    expView = d.getFullYear() + '-' + pad(d.getMonth() + 1);
+    renderExpenses();
+  }
+  if (el.expForm) {
+    el.expPaidBy.value = ROLE;
+    el.expDate.value = todayKey();
+    el.expDate.max = todayKey();
+    el.expPaidBy.addEventListener('change', renderExpenses);
+    el.expPrev.addEventListener('click', function () { shiftExpMonth(-1); });
+    el.expNext.addEventListener('click', function () { shiftExpMonth(1); });
+    el.expForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var amount = Math.round(parseFloat(el.expAmount.value) * 100);
+      var what = el.expWhat.value.trim();
+      var date = el.expDate.value;
+      if (!(amount > 0)) { setExpMsg('Enter an amount above zero.', 'error'); return; }
+      if (!what) { setExpMsg('Write what it was for.', 'error'); return; }
+      if (!date) { setExpMsg('Choose a date.', 'error'); return; }
+      var split = el.expSplit.value;
+      var id = newId();
+      state.expenses[id] = {
+        amount: amount, what: what, date: date,
+        paidBy: el.expPaidBy.value === 'member' ? 'member' : 'admin',
+        split: split === 'payer' || split === 'other' || split === 'settle' ? split : 'half',
+        by: ROLE, created: Date.now()
+      };
+      stamp('x:' + id);
+      el.expAmount.value = '';
+      el.expWhat.value = '';
+      expView = date.slice(0, 7);
+      save();
+      render();
+      setExpMsg('Added.', 'ok');
+      el.expAmount.focus();
     });
-  });
+    el.expList.addEventListener('click', function (e) {
+      var del = e.target.closest('.del');
+      if (!del) return;
+      var id = del.closest('li').dataset.id;
+      var x = state.expenses[id];
+      if (!x || (x.by !== ROLE && ROLE !== 'admin')) return;
+      armOrRun(del, function () {
+        delete state.expenses[id];
+        stamp('x:' + id);
+        save();
+        render();
+      });
+    });
+  }
 
   if (el.assignDue) el.assignDue.min = todayKey();
   render();

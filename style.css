@@ -408,3 +408,30 @@ html.locked body > *:not(#loginGate) { display: none !important; }
 .login-card .form-msg:empty { display: none; }
 .user-bar { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 .sync-chip + .user-bar { margin-left: 8px; }
+
+/* ---------- Two-way tasks + expenses ---------- */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.count-pill { font-size: 0.8rem; color: var(--muted); background: var(--cell); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.count-pill strong { color: var(--accent); }
+.video-form select {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--text);
+  font-weight: 400;
+  font-size: 1rem;
+  width: 100%;
+}
+.video-form select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+#tabExpenses { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+.balance-card { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--panel)); }
+.balance-label { margin: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.balance-amount { margin: 4px 0 0; font-size: 1.5rem; font-weight: 700; overflow-wrap: anywhere; }
+.exp-list { margin-top: 14px; }
+.exp-amount { flex: none; font-weight: 700; white-space: nowrap; }
+.exp-amount.admin { color: var(--accent); }
+.exp-amount.member { color: var(--accent-2); }
+@media (max-width: 860px) {
+  #tabExpenses { grid-template-columns: minmax(0, 1fr); }
+}
