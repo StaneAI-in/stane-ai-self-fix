@@ -511,6 +511,7 @@
     [['calendar', el.tabCalendar, el.tabBtnCalendar],
      ['english', el.tabEnglish, el.tabBtnEnglish],
      ['team', $('tabTeam'), $('tabBtnTeam')],
+     ['board', $('tabBoard'), $('tabBtnBoard')],
      ['ideas', $('tabIdeas'), $('tabBtnIdeas')],
      ['expenses', $('tabExpenses'), $('tabBtnExpenses')],
      ['sync', el.tabSync, el.tabBtnSync]].forEach(function (t) {
@@ -721,6 +722,7 @@
   el.tabBtnEnglish.addEventListener('click', function () { showTab('english'); });
   el.tabBtnSync.addEventListener('click', function () { showTab('sync'); });
   $('tabBtnTeam').addEventListener('click', function () { showTab('team'); });
+  $('tabBtnBoard').addEventListener('click', function () { showTab('board'); });
   $('tabBtnIdeas').addEventListener('click', function () { showTab('ideas'); });
   $('tabBtnExpenses').addEventListener('click', function () { showTab('expenses'); });
 

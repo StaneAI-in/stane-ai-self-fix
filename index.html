@@ -29,7 +29,8 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="true" class="tab active">Calendar</button>
     <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
-    <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="false" class="tab">Team</button>
+    <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="false" class="tab">Assigned</button>
+    <button type="button" role="tab" id="tabBtnBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
@@ -198,6 +199,50 @@
             <span class="form-msg" id="tmNamesMsg" role="status"></span>
           </div>
         </form>
+      </section>
+    </div>
+  </main>
+
+  <!-- ===================== Team tasks board ===================== -->
+  <main class="ideas-wrap" id="tabBoard" role="tabpanel" aria-labelledby="tabBtnBoard" hidden>
+    <section class="card board-add" aria-label="Add a team task">
+      <h2>Add a team task</h2>
+      <p class="hint">Both of you can add tasks here and change their status.</p>
+      <form id="tmBoardForm" class="add board-form" autocomplete="off">
+        <input type="text" id="tmBoardText" maxlength="200" placeholder="New team task" aria-label="New team task" required>
+        <select id="tmBoardOwner" aria-label="Who will do it">
+          <option value="both">Both</option>
+          <option value="admin">Divyanshu</option>
+          <option value="member">Mohit</option>
+        </select>
+        <input type="date" id="tmBoardDue" aria-label="Due date (optional)">
+        <button type="submit">Add</button>
+      </form>
+    </section>
+    <div class="board">
+      <section class="card board-col todo" aria-labelledby="tmBoardHead_todo">
+        <div class="card-head">
+          <h2 id="tmBoardHead_todo">To do</h2>
+          <span class="count-pill"><strong id="tmBoardTodoCount">0</strong></span>
+        </div>
+        <ul class="board-list" id="tmBoardTodo"></ul>
+        <p class="empty" id="tmBoardTodoEmpty">Nothing here.</p>
+      </section>
+      <section class="card board-col doing" aria-labelledby="tmBoardHead_doing">
+        <div class="card-head">
+          <h2 id="tmBoardHead_doing">In progress</h2>
+          <span class="count-pill"><strong id="tmBoardDoingCount">0</strong></span>
+        </div>
+        <ul class="board-list" id="tmBoardDoing"></ul>
+        <p class="empty" id="tmBoardDoingEmpty">Nothing here.</p>
+      </section>
+      <section class="card board-col done" aria-labelledby="tmBoardHead_done">
+        <div class="card-head">
+          <h2 id="tmBoardHead_done">Done</h2>
+          <span class="count-pill"><strong id="tmBoardDoneCount">0</strong></span>
+        </div>
+        <ul class="board-list" id="tmBoardDone"></ul>
+        <p class="empty" id="tmBoardDoneEmpty">Nothing here.</p>
       </section>
     </div>
   </main>

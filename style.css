@@ -435,3 +435,38 @@ html.locked body > *:not(#loginGate) { display: none !important; }
 @media (max-width: 860px) {
   #tabExpenses { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- Team tasks board ---------- */
+.board-add { margin-bottom: 16px; }
+.board-form select, .board-form input[type="date"] {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--text);
+}
+.board-form select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.board-col h2 { font-size: 1rem; }
+.board-col.todo { border-top: 3px solid var(--muted); }
+.board-col.doing { border-top: 3px solid var(--streak); }
+.board-col.done { border-top: 3px solid var(--done); }
+.board-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.board-item { background: var(--cell); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.board-item.done .board-text { text-decoration: line-through; color: var(--muted); }
+.board-text { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.board-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.status-select {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.status-select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.owner-chip { font-weight: 600; border-radius: 999px; padding: 1px 8px; background: var(--accent-soft); color: var(--accent); }
+.owner-chip.member { color: var(--accent-2); }
+@media (max-width: 860px) {
+  .board { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}

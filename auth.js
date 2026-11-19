@@ -11,12 +11,15 @@
   };
   var LOGIN_KEY = 'stane-login';
   var TEAM_TOKEN_KEY = 'stane-team-sync';
+  var PERSONAL_TOKEN_KEY = 'stane-selffix-sync';
   var KEYS = window.STANE_TEAM_KEYS || {};
+  // Admin only: the personal calendar/English sync token, so a new phone fills up on sign-in.
+  var PERSONAL_KEYS = window.STANE_PERSONAL_KEYS || {};
   var root = document.documentElement;
   var page = root.dataset.page === 'member' ? 'member' : 'admin';
 
-  function storedTeamToken() {
-    try { return (JSON.parse(localStorage.getItem(TEAM_TOKEN_KEY) || '{}') || {}).token || ''; } catch (e) { return ''; }
+  function storedToken(key) {
+    try { return (JSON.parse(localStorage.getItem(key) || '{}') || {}).token || ''; } catch (e) { return ''; }
   }
 
   function readLogin() {
@@ -29,7 +32,8 @@
 
   var login = readLogin();
   // Sync was switched on after this device signed in: one more sign-in unlocks it.
-  var needsUnlock = !!(login && KEYS[login.h] && !storedTeamToken());
+  var needsUnlock = !!(login && ((KEYS[login.h] && !storedToken(TEAM_TOKEN_KEY)) ||
+    (PERSONAL_KEYS[login.h] && !storedToken(PERSONAL_TOKEN_KEY))));
   if (needsUnlock) login = null;
 
   if (login && page === 'admin' && login.role !== 'admin') { location.replace('team.html'); return; }
@@ -100,6 +104,12 @@
           var token = await unlockToken(secret, KEYS[h]);
           localStorage.setItem(TEAM_TOKEN_KEY, JSON.stringify({ token: token }));
         } catch (err) { /* sync stays off; the Team screen says so */ }
+      }
+      if (PERSONAL_KEYS[h]) {
+        try {
+          var personal = await unlockToken(secret, PERSONAL_KEYS[h]);
+          localStorage.setItem(PERSONAL_TOKEN_KEY, JSON.stringify({ token: personal }));
+        } catch (err) { /* personal sync stays off; the Sync tab says so */ }
       }
       try { localStorage.setItem(LOGIN_KEY, JSON.stringify({ h: h, email: email })); }
       catch (err) {

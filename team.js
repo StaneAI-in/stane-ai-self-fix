@@ -39,7 +39,11 @@
     expMonthTitle: $('tmExpMonthTitle'), expPrev: $('tmExpPrev'), expNext: $('tmExpNext'),
     expTotal: $('tmExpTotal'), expPaidAdmin: $('tmExpPaidAdmin'), expPaidMember: $('tmExpPaidMember'),
     expPaidAdminLabel: $('tmExpPaidAdminLabel'), expPaidMemberLabel: $('tmExpPaidMemberLabel'),
-    expList: $('tmExpList'), expEmpty: $('tmExpEmpty')
+    expList: $('tmExpList'), expEmpty: $('tmExpEmpty'),
+    boardForm: $('tmBoardForm'), boardText: $('tmBoardText'), boardOwner: $('tmBoardOwner'), boardDue: $('tmBoardDue'),
+    board: { todo: $('tmBoardTodo'), doing: $('tmBoardDoing'), done: $('tmBoardDone') },
+    boardCount: { todo: $('tmBoardTodoCount'), doing: $('tmBoardDoingCount'), done: $('tmBoardDoneCount') },
+    boardEmpty: { todo: $('tmBoardTodoEmpty'), doing: $('tmBoardDoingEmpty'), done: $('tmBoardDoneEmpty') }
   };
   if (!el.mine) return;
 
@@ -81,7 +85,7 @@
   function toOf(t) { return t.to || 'member'; }
 
   /* ---------------- state ---------------- */
-  var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'stamps'];
+  var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -97,7 +101,7 @@
   function save() { saveLocal(); scheduleSync(); }
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
-  var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses' };
+  var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -115,6 +119,7 @@
       if (part) s[part][key.slice(i + 1)] = v;
     });
     Object.keys(s.done).forEach(function (id) { if (!s.tasks[id]) delete s.done[id]; });
+    Object.keys(s.sharedStatus).forEach(function (id) { if (!s.shared[id]) delete s.sharedStatus[id]; });
     Object.keys(stamps).sort().forEach(function (k) { s.stamps[k] = stamps[k]; });
     return s;
   }
@@ -377,7 +382,93 @@
     if (el.nameMember && active !== el.nameMember) el.nameMember.value = state.names.member || '';
   }
 
-  function render() { renderTasks(); renderIdeas(); renderExpenses(); renderNames(); }
+  /* ---------------- render: team task board (both add, both change status) ---------------- */
+  var STATUSES = [['todo', 'To do'], ['doing', 'In progress'], ['done', 'Done']];
+  function statusOf(id) {
+    var st = state.sharedStatus[id];
+    return st && (st.status === 'doing' || st.status === 'done') ? st.status : 'todo';
+  }
+  function statusLabel(key) { return STATUSES.filter(function (p) { return p[0] === key; })[0][1]; }
+  function ownerLabel(o) { return o === 'admin' || o === 'member' ? nameOf(o) : 'Both'; }
+
+  function renderBoard() {
+    if (!el.board.todo) return;
+    if (el.boardOwner) {
+      el.boardOwner.options[1].textContent = nameOf('admin') + (ROLE === 'admin' ? ' (you)' : '');
+      el.boardOwner.options[2].textContent = nameOf('member') + (ROLE === 'member' ? ' (you)' : '');
+    }
+    var groups = { todo: [], doing: [], done: [] };
+    Object.keys(state.shared).forEach(function (id) { groups[statusOf(id)].push(id); });
+    STATUSES.forEach(function (pair) {
+      var key = pair[0], ids = groups[key], list = el.board[key];
+      ids.sort(function (a, b) {
+        if (key === 'done') return (state.sharedStatus[b].at || 0) - (state.sharedStatus[a].at || 0);
+        var x = state.shared[a], y = state.shared[b];
+        var dx = x.due || '9999', dy = y.due || '9999';
+        return dx < dy ? -1 : dx > dy ? 1 : x.created - y.created;
+      });
+      list.textContent = '';
+      ids.forEach(function (id) {
+        var t = state.shared[id], st = state.sharedStatus[id];
+        var li = document.createElement('li');
+        li.className = 'board-item ' + key;
+        li.dataset.id = id;
+
+        var text = document.createElement('p');
+        text.className = 'board-text';
+        text.textContent = t.text;
+        li.appendChild(text);
+
+        var meta = document.createElement('div');
+        meta.className = 'team-meta';
+        var who = document.createElement('span');
+        who.className = 'owner-chip ' + (t.owner || 'both');
+        who.textContent = ownerLabel(t.owner);
+        meta.appendChild(who);
+        if (t.due) {
+          var due = document.createElement('span');
+          var overdue = key !== 'done' && t.due < todayKey();
+          due.className = 'time-chip' + (overdue ? ' overdue' : '');
+          due.textContent = (overdue ? 'Overdue · ' : 'Due ') + shortKey(t.due);
+          meta.appendChild(due);
+        }
+        var info = document.createElement('span');
+        info.textContent = st && st.by
+          ? nameOf(st.by) + ' marked ' + statusLabel(key) + ' · ' + shortStamp(st.at)
+          : 'Added by ' + nameOf(t.by) + ' · ' + shortStamp(t.created);
+        meta.appendChild(info);
+        li.appendChild(meta);
+
+        var row = document.createElement('div');
+        row.className = 'board-actions';
+        var sel = document.createElement('select');
+        sel.className = 'status-select';
+        sel.setAttribute('aria-label', 'Status of: ' + t.text);
+        STATUSES.forEach(function (p) {
+          var o = document.createElement('option');
+          o.value = p[0];
+          o.textContent = p[1];
+          if (p[0] === key) o.selected = true;
+          sel.appendChild(o);
+        });
+        row.appendChild(sel);
+        if (t.by === ROLE || ROLE === 'admin') {
+          var del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'del';
+          del.textContent = '✕';
+          del.setAttribute('aria-label', 'Delete: ' + t.text);
+          row.appendChild(del);
+        }
+        li.appendChild(row);
+        list.appendChild(li);
+      });
+      if (el.boardCount[key]) el.boardCount[key].textContent = ids.length;
+      if (el.boardEmpty[key]) el.boardEmpty[key].hidden = ids.length > 0;
+    });
+  }
+
+  function render() { renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderNames(); }
 
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
@@ -690,6 +781,58 @@
         stamp('x:' + id);
         save();
         render();
+      });
+    });
+  }
+
+  /* ---------------- events: team task board ---------------- */
+  if (el.boardForm) {
+    el.boardDue.min = todayKey();
+    el.boardForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = el.boardText.value.trim();
+      if (!text) return;
+      var owner = el.boardOwner.value;
+      var id = newId();
+      state.shared[id] = {
+        text: text,
+        owner: owner === 'admin' || owner === 'member' ? owner : 'both',
+        due: el.boardDue.value || '',
+        by: ROLE,
+        created: Date.now()
+      };
+      stamp('s:' + id);
+      el.boardText.value = '';
+      el.boardDue.value = '';
+      save();
+      render();
+      el.boardText.focus();
+    });
+    ['todo', 'doing', 'done'].forEach(function (key) {
+      var list = el.board[key];
+      list.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('status-select')) return;
+        var id = e.target.closest('li').dataset.id;
+        if (!state.shared[id]) return;
+        state.sharedStatus[id] = { status: e.target.value, by: ROLE, at: Date.now() };
+        stamp('ss:' + id);
+        save();
+        render();
+      });
+      list.addEventListener('click', function (e) {
+        var del = e.target.closest('.del');
+        if (!del) return;
+        var id = del.closest('li').dataset.id;
+        var t = state.shared[id];
+        if (!t || (t.by !== ROLE && ROLE !== 'admin')) return;
+        armOrRun(del, function () {
+          delete state.shared[id];
+          delete state.sharedStatus[id];
+          stamp('s:' + id);
+          stamp('ss:' + id);
+          save();
+          render();
+        });
       });
     });
   }
