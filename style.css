@@ -350,11 +350,61 @@ h3 {
 .sync-status.off, .sync-status.busy { color: var(--muted); }
 .steps { margin: 10px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
 
+/* ---------- Team ---------- */
+.layout.single { grid-template-columns: minmax(0, 760px); justify-content: center; }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.team-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.team-stats .stat { box-shadow: none; background: var(--cell); }
+.tasks li.team-task { align-items: flex-start; }
+.team-task input[type="checkbox"] { margin-top: 3px; }
+.team-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.team-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 0.78rem; color: var(--muted); }
+.team-note { margin: 0; font-size: 0.88rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.time-chip.overdue { color: var(--cross); background: transparent; border: 1px solid var(--cross); }
+
+/* ---------- Ideas board: both people side by side ---------- */
+.ideas-wrap { max-width: 1140px; margin: 0 auto; padding: 14px 16px 40px; }
+.ideas-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.idea-col h2 { padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+.idea-col + .idea-col h2 { border-bottom-color: var(--accent-2); }
+.idea-form { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 4px; }
+.idea-form textarea {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  resize: vertical;
+  width: 100%;
+}
+.idea-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.idea-form button { align-self: flex-start; }
+.ideas { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ideas li { background: var(--cell); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.idea-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.idea-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 0.75rem; color: var(--muted); }
+
 @media (max-width: 860px) {
   .layout, #tabEnglish { grid-template-columns: minmax(0, 1fr); }
+  .ideas-board { gap: 8px; }
+  .ideas-wrap { padding-left: 8px; padding-right: 8px; }
+  .ideas li { padding: 8px; }
   .card { padding: 14px; }
   .weekdays, .grid { gap: 4px; }
   .cell { padding: 4px; }
   .cell .count { font-size: 0.65rem; }
   .stat-label { font-size: 0.72rem; }
 }
+
+/* ---------- Sign-in ---------- */
+html.locked body > *:not(#loginGate) { display: none !important; }
+#loginGate { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.login-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.login-card img { border-radius: 12px; }
+.login-card h1 { margin: 0; font-size: 1.4rem; }
+.login-card .hint { margin: 0; }
+.login-card label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.login-card input { background: var(--cell); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; color: var(--text); font-weight: 400; font-size: 1rem; }
+.login-card input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.login-card .form-msg:empty { display: none; }
+.user-bar { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.sync-chip + .user-bar { margin-left: 8px; }

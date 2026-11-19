@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page="admin" class="locked">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,7 @@
   <title>Stane AI SELF-FIX</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
+  <script src="auth.js"></script>
 </head>
 <body>
   <header class="top">
@@ -27,6 +28,8 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="true" class="tab active">Calendar</button>
     <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
+    <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="false" class="tab">Team</button>
+    <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
     <span class="sync-chip off" id="syncChip">Sync off</span>
   </nav>
@@ -116,6 +119,118 @@
     </section>
   </main>
 
+  <!-- ===================== Team tab (admin) ===================== -->
+  <main class="layout" id="tabTeam" role="tabpanel" aria-labelledby="tabBtnTeam" hidden>
+    <div class="col">
+      <section class="card" aria-label="Assign a task">
+        <h2>Assign a task to your partner</h2>
+        <form id="tmAssignForm" class="video-form" autocomplete="off">
+          <label>Task
+            <input type="text" id="tmAssignText" maxlength="200" placeholder="e.g. Finish the landing page copy" required>
+          </label>
+          <div class="field-row">
+            <label>Due date (optional)
+              <input type="date" id="tmAssignDue">
+            </label>
+            <label>Time (optional)
+              <input type="time" id="tmAssignTime">
+            </label>
+          </div>
+          <label>Details (optional)
+            <textarea id="tmAssignNote" rows="2" maxlength="1000" placeholder="Anything they should know"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Assign</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-label="Assigned tasks">
+        <div class="team-stats">
+          <div class="stat"><span class="stat-num" id="tmPendingCount">0</span><span class="stat-label">pending</span></div>
+          <div class="stat"><span class="stat-num" id="tmDoneCount">0</span><span class="stat-label">done</span></div>
+        </div>
+        <h3>Pending</h3>
+        <ul class="tasks" id="tmTaskList"></ul>
+        <p class="empty" id="tmTaskEmpty">No pending tasks.</p>
+        <h3>Done</h3>
+        <ul class="tasks" id="tmDoneList"></ul>
+        <p class="empty" id="tmDoneEmpty">Nothing finished yet.</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" aria-label="Team connection">
+        <h2>Team connection</h2>
+        <p class="sync-status off" id="tmStatus" role="status"></p>
+        <p class="hint" id="tmTokenHint"></p>
+        <form id="tmForm" class="video-form" autocomplete="off">
+          <label>Team token for this device (optional)
+            <input type="password" id="tmToken" autocomplete="off" spellcheck="false" placeholder="Paste a token with access to stane-ai-team-data">
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Connect</button>
+            <button type="button" class="ghost-btn" id="tmSyncNow" hidden>Sync now</button>
+            <button type="button" class="ghost-btn" id="tmSyncOff" hidden>Disconnect</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-label="Names">
+        <h2>Names</h2>
+        <form id="tmNamesForm" class="video-form" autocomplete="off">
+          <div class="field-row">
+            <label>Your name
+              <input type="text" id="tmNameAdmin" maxlength="40" placeholder="Admin">
+            </label>
+            <label>Partner's name
+              <input type="text" id="tmNameMember" maxlength="40" placeholder="Partner">
+            </label>
+          </div>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Save names</button>
+            <span class="form-msg" id="tmNamesMsg" role="status"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-label="How to give your partner access">
+        <h2>Give your partner access</h2>
+        <ol class="steps">
+          <li>On GitHub, create a <strong>private</strong> repository named <strong>stane-ai-team-data</strong>.</li>
+          <li>Edit your own sync token and add <strong>stane-ai-team-data</strong> to its repositories, so your Team and Ideas tabs work.</li>
+          <li>Create a second fine-grained token with access to <strong>only stane-ai-team-data</strong>, Contents set to "Read and write". This one is for your partner; it cannot see your personal calendar or English data.</li>
+          <li>Send your partner that token privately, along with the link to <strong>team.html</strong> on this site.</li>
+          <li>They open the link, paste the token, and see only the tasks you assign and the shared Ideas board.</li>
+        </ol>
+      </section>
+    </div>
+  </main>
+
+  <!-- ===================== Ideas tab ===================== -->
+  <main class="ideas-wrap" id="tabIdeas" role="tabpanel" aria-labelledby="tabBtnIdeas" hidden>
+    <div class="ideas-board">
+      <section class="card idea-col" aria-labelledby="tmIdeaHeadAdmin">
+        <h2 id="tmIdeaHeadAdmin">Admin</h2>
+        <form class="idea-form" id="tmIdeaFormAdmin" autocomplete="off">
+          <textarea id="tmIdeaInputAdmin" rows="2" maxlength="1000" placeholder="Write an idea…" aria-label="New idea"></textarea>
+          <button type="submit" class="primary-btn">Add idea</button>
+        </form>
+        <ul class="ideas" id="tmIdeasAdmin"></ul>
+        <p class="empty" id="tmIdeaEmptyAdmin">No ideas yet.</p>
+      </section>
+      <section class="card idea-col" aria-labelledby="tmIdeaHeadMember">
+        <h2 id="tmIdeaHeadMember">Partner</h2>
+        <form class="idea-form" id="tmIdeaFormMember" autocomplete="off">
+          <textarea id="tmIdeaInputMember" rows="2" maxlength="1000" placeholder="Write an idea…" aria-label="New idea"></textarea>
+          <button type="submit" class="primary-btn">Add idea</button>
+        </form>
+        <ul class="ideas" id="tmIdeasMember"></ul>
+        <p class="empty" id="tmIdeaEmptyMember">No ideas yet.</p>
+      </section>
+    </div>
+  </main>
+
   <!-- ===================== Sync tab ===================== -->
   <main class="layout" id="tabSync" role="tabpanel" aria-labelledby="tabBtnSync" hidden>
     <section class="card" aria-label="Sync between devices">
@@ -148,5 +263,6 @@
   </main>
 
   <script src="app.js"></script>
+  <script src="team.js"></script>
 </body>
 </html>

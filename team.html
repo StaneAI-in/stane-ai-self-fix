@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" data-page="member" class="locked">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Stane AI Team</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="auth.js"></script>
+</head>
+<body data-role="member">
+  <header class="top">
+    <div class="brand">
+      <img src="logo.svg" alt="" width="44" height="44">
+      <div>
+        <h1>Stane AI Team</h1>
+        <p class="tagline" id="tmHello"></p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-num" id="tmPendingCount">0</span><span class="stat-label">pending</span></div>
+      <div class="stat"><span class="stat-num" id="tmDoneCount">0</span><span class="stat-label">done</span></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">My tasks</button>
+    <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
+    <button type="button" role="tab" data-tab="tabConnect" aria-controls="tabConnect" aria-selected="false" class="tab">Connect</button>
+    <span class="sync-chip off" id="tmChip">Not connected</span>
+  </nav>
+
+  <!-- ===================== Tasks ===================== -->
+  <main class="layout single" id="tabTasks" role="tabpanel">
+    <section class="card" aria-label="Tasks assigned to you">
+      <h2>Tasks assigned to you</h2>
+      <p class="hint">Tick a task when you finish it. It is updated for both of you.</p>
+      <h3>To do</h3>
+      <ul class="tasks" id="tmTaskList"></ul>
+      <p class="empty" id="tmTaskEmpty">Nothing to do right now.</p>
+      <h3>Done</h3>
+      <ul class="tasks" id="tmDoneList"></ul>
+      <p class="empty" id="tmDoneEmpty">Nothing finished yet.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Ideas ===================== -->
+  <main class="ideas-wrap" id="tabIdeas" role="tabpanel" hidden>
+    <div class="ideas-board">
+      <section class="card idea-col" aria-labelledby="tmIdeaHeadAdmin">
+        <h2 id="tmIdeaHeadAdmin">Admin</h2>
+        <ul class="ideas" id="tmIdeasAdmin"></ul>
+        <p class="empty" id="tmIdeaEmptyAdmin">No ideas yet.</p>
+      </section>
+      <section class="card idea-col" aria-labelledby="tmIdeaHeadMember">
+        <h2 id="tmIdeaHeadMember">Partner</h2>
+        <form class="idea-form" id="tmIdeaFormMember" autocomplete="off">
+          <textarea id="tmIdeaInputMember" rows="2" maxlength="1000" placeholder="Write an idea…" aria-label="New idea"></textarea>
+          <button type="submit" class="primary-btn">Add idea</button>
+        </form>
+        <ul class="ideas" id="tmIdeasMember"></ul>
+        <p class="empty" id="tmIdeaEmptyMember">No ideas yet.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- ===================== Connect ===================== -->
+  <main class="layout" id="tabConnect" role="tabpanel" hidden>
+    <section class="card" aria-label="Connect">
+      <h2>Connect this device</h2>
+      <p class="sync-status off" id="tmStatus" role="status"></p>
+      <form id="tmForm" class="video-form" autocomplete="off">
+        <label>Team token
+          <input type="password" id="tmToken" autocomplete="off" spellcheck="false" placeholder="Paste the token you were given">
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn">Connect</button>
+          <button type="button" class="ghost-btn" id="tmSyncNow" hidden>Sync now</button>
+          <button type="button" class="ghost-btn" id="tmSyncOff" hidden>Disconnect</button>
+        </div>
+      </form>
+      <p class="hint">The token is saved only in this browser. Ask for a new one if it stops working.</p>
+    </section>
+
+    <section class="card" aria-label="Your name">
+      <h2>Your name</h2>
+      <form id="tmNamesForm" class="video-form" autocomplete="off">
+        <label>Name shown on the Ideas board
+          <input type="text" id="tmNameMember" maxlength="40" placeholder="Partner">
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn">Save</button>
+          <span class="form-msg" id="tmNamesMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll('.tab[data-tab]');
+      function show(id) {
+        tabs.forEach(function (t) {
+          var on = t.dataset.tab === id;
+          document.getElementById(t.dataset.tab).hidden = !on;
+          t.classList.toggle('active', on);
+          t.setAttribute('aria-selected', String(on));
+        });
+      }
+      tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+      // First visit with no token: open Connect.
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem('stane-team-sync') || '{}') || {}; } catch (e) { saved = {}; }
+      if (!saved.token) show('tabConnect');
+    })();
+  </script>
+  <script src="team.js"></script>
+</body>
+</html>
