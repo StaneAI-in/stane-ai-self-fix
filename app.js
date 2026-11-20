@@ -8,7 +8,7 @@
   var DB_STORE = 'videos';
   // Optional sync: tasks, streaks and notes (never videos) are kept in one file in a private repo.
   var SYNC_KEY = 'stane-selffix-sync';
-  var SYNC_API = 'https://api.github.com/repos/divyanshu7588/stane-ai-self-fix-data/contents/data.json';
+  var SYNC_API = 'https://api.github.com/repos/StaneAI-in/stane-ai-self-fix-data/contents/data.json';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

@@ -11,7 +11,7 @@
   var LOCAL_KEY = 'stane-team-v1';
   var TOKEN_KEY = 'stane-team-sync';
   var PERSONAL_SYNC_KEY = 'stane-selffix-sync';
-  var API = 'https://api.github.com/repos/divyanshu7588/stane-ai-team-data/contents/team.json';
+  var API = 'https://api.github.com/repos/StaneAI-in/stane-ai-team-data/contents/team.json';
   var DEFAULT_NAMES = { admin: 'Divyanshu', member: 'Mohit' };
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -108,7 +108,7 @@
   // Starting list of projects. Seeded with a tiny stamp, so any real change (an edit
   // or a delete) made on any device always wins over the seed. Raise SEED_STAMP when
   // the seed text changes, so untouched seeds pick up the new text.
-  var SEED_STAMP = 3;       // projects
+  var SEED_STAMP = 4;       // projects
   var IMPL_SEED_STAMP = 3;  // implementation ideas
   var GH = 'https://github.com/divyanshu7588/';
   // id -> [type tag, repo link, live link]
@@ -117,7 +117,7 @@
     'seed-staneai': ['Website', GH + 'StaneAi-website', 'https://staneai.in'],
     'seed-report-generator': ['Web app', '', ''],
     'seed-lead-hunter': ['Web app', GH + 'StaneAi-Lead_hunter', ''],
-    'seed-self-fix': ['Web app', GH + 'stane-ai-self-fix', 'https://divyanshu7588.github.io/stane-ai-self-fix/']
+    'seed-self-fix': ['Web app', 'https://github.com/StaneAI-in/stane-ai-self-fix', 'https://staneai-in.github.io/stane-ai-self-fix/']
   };
   var DEFAULT_PROJECTS = [
     ['seed-stane-ai', 'Stane-AI',
