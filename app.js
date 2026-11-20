@@ -513,6 +513,8 @@
      ['team', $('tabTeam'), $('tabBtnTeam')],
      ['board', $('tabBoard'), $('tabBtnBoard')],
      ['projects', $('tabProjects'), $('tabBtnProjects')],
+     ['links', $('tabLinks'), $('tabBtnLinks')],
+     ['docs', $('tabDocs'), $('tabBtnDocs')],
      ['creds', $('tabCreds'), $('tabBtnCreds')],
      ['ideas', $('tabIdeas'), $('tabBtnIdeas')],
      ['expenses', $('tabExpenses'), $('tabBtnExpenses')],
@@ -726,6 +728,8 @@
   $('tabBtnTeam').addEventListener('click', function () { showTab('team'); });
   $('tabBtnBoard').addEventListener('click', function () { showTab('board'); });
   $('tabBtnProjects').addEventListener('click', function () { showTab('projects'); });
+  $('tabBtnLinks').addEventListener('click', function () { showTab('links'); });
+  $('tabBtnDocs').addEventListener('click', function () { showTab('docs'); });
   $('tabBtnCreds').addEventListener('click', function () { showTab('creds'); });
   $('tabBtnIdeas').addEventListener('click', function () { showTab('ideas'); });
   $('tabBtnExpenses').addEventListener('click', function () { showTab('expenses'); });

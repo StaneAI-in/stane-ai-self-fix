@@ -789,3 +789,55 @@ a.project-link:hover { border-color: var(--accent); }
   .idea-opts { grid-template-columns: minmax(0, 1fr); }
   .remind-pop { left: 12px; right: 12px; bottom: 12px; width: auto; }
 }
+
+/* ---------- Company links ---------- */
+.tab[aria-controls="tabLinks"]::before { content: "🔗"; }
+.tab[aria-controls="tabDocs"]::before { content: "📄"; }
+.board-form input[type="text"] + datalist + button { flex: 0 0 auto; }
+.links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+.link-group h2 { font-size: 1rem; padding-bottom: 8px; border-bottom: 2px solid var(--accent); margin-bottom: 10px; }
+.link-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.link-list li { display: flex; align-items: center; gap: 6px; background: var(--cell); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; text-decoration: none; color: var(--text); }
+a.link-main:hover strong { color: var(--accent); }
+.link-main strong { font-size: 0.95rem; overflow-wrap: anywhere; }
+.link-url { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Documents ---------- */
+#tabDocs { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.doc-kind { font-weight: 700; color: var(--accent); }
+.doc-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.doc-note-text { margin-top: 4px; }
+.video-form input[type="file"] { background: var(--cell); border: 1px dashed var(--line); border-radius: 10px; padding: 10px; }
+@media (max-width: 860px) {
+  #tabDocs { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Collapsible sidebar (wide screens) ---------- */
+.collapse-btn { display: none; }
+@media (min-width: 900px) {
+  .collapse-btn {
+    display: block;
+    align-self: stretch;
+    margin-bottom: 8px;
+    background: var(--cell);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+  }
+  .collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tabs, body { transition: width 0.15s ease, padding-left 0.15s ease; }
+  html.nav-collapsed body { padding-left: 72px; }
+  html.nav-collapsed.locked body { padding-left: 0; }
+  html.nav-collapsed .tabs { width: 72px; padding: 20px 8px; }
+  html.nav-collapsed .collapse-btn { text-align: center; padding: 8px 0; font-size: 1rem; }
+  html.nav-collapsed .tab { font-size: 0; padding: 10px 0; text-align: center; position: relative; }
+  html.nav-collapsed .tab::before { font-size: 1.15rem; width: auto; }
+  html.nav-collapsed .tab .tab-badge { position: absolute; top: 2px; right: 6px; margin: 0; }
+  html.nav-collapsed .tabs .sync-chip,
+  html.nav-collapsed .tabs .user-bar { display: none; }
+}

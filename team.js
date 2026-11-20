@@ -90,7 +90,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -201,7 +201,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -1067,7 +1067,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderNames();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderNames();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -1950,6 +1950,290 @@
     });
   }
 
+  /* ---------------- company links ---------------- */
+  var lk = {
+    form: $('tmLinkForm'), title: $('tmLinkTitle'), url: $('tmLinkUrl'), group: $('tmLinkGroup'),
+    groups: $('tmLinkGroups'), msg: $('tmLinkMsg'), list: $('tmLinkList'), empty: $('tmLinkEmpty'), count: $('tmLinkCount')
+  };
+  function renderLinks() {
+    if (!lk || !lk.list) return;
+    var ids = Object.keys(state.links);
+    lk.count.textContent = ids.length;
+    var groups = {};
+    ids.forEach(function (id) {
+      var g = (state.links[id].group || '').trim() || 'General';
+      (groups[g] = groups[g] || []).push(id);
+    });
+    // Suggest existing groups while typing.
+    lk.groups.textContent = '';
+    Object.keys(groups).sort().forEach(function (g) {
+      var o = document.createElement('option');
+      o.value = g;
+      lk.groups.appendChild(o);
+    });
+    lk.list.textContent = '';
+    Object.keys(groups).sort(function (a, b) {
+      if (a === 'General') return 1;
+      if (b === 'General') return -1;
+      return a.toLowerCase() < b.toLowerCase() ? -1 : 1;
+    }).forEach(function (g) {
+      var sec = document.createElement('section');
+      sec.className = 'card link-group';
+      var h = document.createElement('h2');
+      h.textContent = g;
+      sec.appendChild(h);
+      var ul = document.createElement('ul');
+      ul.className = 'link-list';
+      groups[g].sort(function (a, b) {
+        return state.links[a].title.toLowerCase() < state.links[b].title.toLowerCase() ? -1 : 1;
+      }).forEach(function (id) {
+        var l = state.links[id], url = safeUrl(l.url);
+        var li = document.createElement('li');
+        li.dataset.id = id;
+        var a = document.createElement(url ? 'a' : 'span');
+        a.className = 'link-main';
+        if (url) { a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        var t = document.createElement('strong');
+        t.textContent = l.title;
+        var u = document.createElement('span');
+        u.className = 'link-url';
+        u.textContent = url ? url.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'Invalid link';
+        a.appendChild(t);
+        a.appendChild(u);
+        li.appendChild(a);
+        var copy = document.createElement('button');
+        copy.type = 'button';
+        copy.className = 'mini-btn link-copy';
+        copy.textContent = 'Copy';
+        li.appendChild(copy);
+        if (l.by === ROLE || ROLE === 'admin') li.appendChild(delButton('link-del', 'Delete link: ' + l.title));
+        ul.appendChild(li);
+      });
+      sec.appendChild(ul);
+      lk.list.appendChild(sec);
+    });
+    lk.empty.hidden = ids.length > 0;
+  }
+  if (lk.form) {
+    lk.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var title = lk.title.value.trim(), url = safeUrl(lk.url.value);
+      if (!title) return;
+      if (!url) { lk.msg.textContent = 'Enter a valid web link.'; lk.msg.className = 'form-msg error'; return; }
+      var id = newId();
+      state.links[id] = { title: title.slice(0, 80), url: url, group: lk.group.value.trim().slice(0, 40), by: ROLE, created: Date.now() };
+      stamp('lk:' + id);
+      lk.title.value = '';
+      lk.url.value = '';
+      lk.msg.textContent = 'Added.';
+      lk.msg.className = 'form-msg ok';
+      save();
+      render();
+      lk.title.focus();
+    });
+    lk.list.addEventListener('click', function (e) {
+      var li = e.target.closest('li[data-id]');
+      if (!li) return;
+      var id = li.dataset.id, l = state.links[id];
+      if (!l) return;
+      var copy = e.target.closest('.link-copy');
+      if (copy) {
+        if (navigator.clipboard) navigator.clipboard.writeText(l.url).then(function () {
+          copy.textContent = 'Copied';
+          setTimeout(function () { if (copy.isConnected) copy.textContent = 'Copy'; }, 1500);
+        });
+        return;
+      }
+      var del = e.target.closest('.link-del');
+      if (!del || (l.by !== ROLE && ROLE !== 'admin')) return;
+      armOrRun(del, function () {
+        delete state.links[id];
+        stamp('lk:' + id);
+        save();
+        render();
+      });
+    });
+  }
+
+  /* ---------------- documents (files live in the private team data repository) ---------------- */
+  var DOC_MAX = 10 * 1024 * 1024;
+  var FILES_API = API.replace(/team\.json$/, 'docs/');
+  var dc = {
+    form: $('tmDocForm'), title: $('tmDocTitle'), file: $('tmDocFile'), url: $('tmDocUrl'), note: $('tmDocNote'),
+    btn: $('tmDocBtn'), msg: $('tmDocMsg'), list: $('tmDocList'), empty: $('tmDocEmpty'), count: $('tmDocCount')
+  };
+  var openNotes = {};
+  function fileSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  }
+  function setDocMsg(text, kind) { dc.msg.textContent = text; dc.msg.className = 'form-msg' + (kind ? ' ' + kind : ''); }
+  function readAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result).split(',')[1] || ''); };
+      r.onerror = function () { reject(r.error); };
+      r.readAsDataURL(file);
+    });
+  }
+  function filesFetch(path, opts) {
+    opts = opts || {};
+    var headers = { 'Accept': opts.raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json', 'Authorization': 'Bearer ' + sync.token };
+    return fetch(FILES_API + path, { method: opts.method || 'GET', cache: 'no-store', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  }
+  function renderDocs() {
+    if (!dc || !dc.list) return;
+    var ids = Object.keys(state.docs).sort(function (a, b) { return state.docs[b].created - state.docs[a].created; });
+    dc.count.textContent = ids.length;
+    dc.list.textContent = '';
+    ids.forEach(function (id) {
+      var d = state.docs[id];
+      var li = document.createElement('li');
+      li.className = 'board-item doc-item';
+      li.dataset.id = id;
+      var head = document.createElement('div');
+      head.className = 'remark-head';
+      var kind = document.createElement('span');
+      kind.className = 'doc-kind';
+      kind.textContent = d.path ? '📎 File' : d.url ? '🔗 Link' : '📝 Note';
+      head.appendChild(kind);
+      var meta = document.createElement('span');
+      meta.textContent = nameOf(d.by) + ' · ' + shortStamp(d.created) + (d.size ? ' · ' + fileSize(d.size) : '');
+      head.appendChild(meta);
+      if (d.by === ROLE || ROLE === 'admin') head.appendChild(delButton('doc-del', 'Delete document: ' + d.title));
+      li.appendChild(head);
+      var t = document.createElement('p');
+      t.className = 'board-text';
+      t.textContent = d.title;
+      li.appendChild(t);
+      if (d.path && d.name) {
+        var fn = document.createElement('span');
+        fn.className = 'link-url';
+        fn.textContent = d.name;
+        li.appendChild(fn);
+      }
+      var row = document.createElement('div');
+      row.className = 'doc-actions';
+      if (d.path) {
+        var dl = document.createElement('button');
+        dl.type = 'button';
+        dl.className = 'mini-btn doc-download';
+        dl.textContent = 'Download';
+        row.appendChild(dl);
+      }
+      var url = safeUrl(d.url);
+      if (url) row.appendChild(linkChip(url, 'Open'));
+      if (d.note) {
+        var nb = document.createElement('button');
+        nb.type = 'button';
+        nb.className = 'mini-btn doc-note';
+        nb.textContent = openNotes[id] ? 'Hide note' : 'Show note';
+        row.appendChild(nb);
+      }
+      if (row.childNodes.length) li.appendChild(row);
+      if (d.note && openNotes[id]) {
+        var n = document.createElement('p');
+        n.className = 'desc-text doc-note-text';
+        n.textContent = d.note;
+        li.appendChild(n);
+      }
+      dc.list.appendChild(li);
+    });
+    dc.empty.hidden = ids.length > 0;
+  }
+  if (dc.form) {
+    dc.form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var title = dc.title.value.trim();
+      var file = dc.file.files && dc.file.files[0];
+      var url = dc.url.value.trim() ? safeUrl(dc.url.value) : '';
+      var note = dc.note.value.trim();
+      if (!title) return;
+      if (dc.url.value.trim() && !url) { setDocMsg('That link is not valid.', 'error'); return; }
+      if (!file && !url && !note) { setDocMsg('Add a file, a link or a note.', 'error'); return; }
+      var id = newId();
+      var doc = { title: title.slice(0, 120), url: url, note: note.slice(0, 5000), by: ROLE, created: Date.now() };
+      if (file) {
+        if (file.size > DOC_MAX) { setDocMsg('Files can be up to 10 MB.', 'error'); return; }
+        if (!sync.token) { setDocMsg('Sign in with sync turned on to upload files.', 'error'); return; }
+        var safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80) || 'file';
+        var path = id + '/' + safeName;
+        dc.btn.disabled = true;
+        setDocMsg('Uploading…');
+        try {
+          var res = await filesFetch(path, { method: 'PUT', body: { message: 'Add document', content: await readAsBase64(file) } });
+          if (!res.ok) throw new Error(res.status === 413 || res.status === 422 ? 'GitHub refused the file (too big or not allowed).' : 'Upload failed (' + res.status + ').');
+        } catch (err) {
+          dc.btn.disabled = false;
+          setDocMsg(err instanceof TypeError ? 'Could not reach GitHub. Check the internet connection.' : err.message, 'error');
+          return;
+        }
+        dc.btn.disabled = false;
+        doc.path = path;
+        doc.name = file.name.slice(0, 120);
+        doc.size = file.size;
+        doc.mime = file.type || '';
+      }
+      state.docs[id] = doc;
+      stamp('dc:' + id);
+      dc.form.reset();
+      setDocMsg('Saved.', 'ok');
+      save();
+      render();
+    });
+    dc.list.addEventListener('click', async function (e) {
+      var li = e.target.closest('li[data-id]');
+      if (!li) return;
+      var id = li.dataset.id, d = state.docs[id];
+      if (!d) return;
+      if (e.target.closest('.doc-note')) { openNotes[id] = !openNotes[id]; renderDocs(); return; }
+      var dl = e.target.closest('.doc-download');
+      if (dl) {
+        if (!sync.token) { dl.textContent = 'Sign in first'; return; }
+        dl.disabled = true;
+        dl.textContent = 'Downloading…';
+        try {
+          var res = await filesFetch(d.path, { raw: true });
+          if (!res.ok) throw new Error(res.status);
+          var blob = await res.blob();
+          if (d.mime) blob = new Blob([blob], { type: d.mime });
+          var href = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = href;
+          a.download = d.name || 'document';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(href); }, 30000);
+          dl.textContent = 'Download';
+        } catch (err) {
+          dl.textContent = 'Failed, try again';
+        }
+        dl.disabled = false;
+        return;
+      }
+      var del = e.target.closest('.doc-del');
+      if (!del || (d.by !== ROLE && ROLE !== 'admin')) return;
+      armOrRun(del, async function () {
+        delete state.docs[id];
+        stamp('dc:' + id);
+        save();
+        render();
+        if (d.path && sync.token) {
+          // Remove the stored file too; if this fails the file just stays in the private repo.
+          try {
+            var info = await filesFetch(d.path);
+            if (info.ok) {
+              var j = await info.json();
+              await filesFetch(d.path, { method: 'DELETE', body: { message: 'Delete document', sha: j.sha } });
+            }
+          } catch (err) { /* ignore */ }
+        }
+      });
+    });
+  }
+
   if (el.assignDue) el.assignDue.min = todayKey();
   render();
   syncNow();
@@ -1997,4 +2281,22 @@
     setTimeout(function () { updateTitle(); setOpen(false); window.scrollTo(0, 0); }, 0);
   });
   updateTitle();
+
+  // Wide screens: shrink the sidebar to icons only. Remembered per browser.
+  var COLLAPSE_KEY = 'stane-nav-collapsed';
+  var fold = document.createElement('button');
+  fold.type = 'button';
+  fold.className = 'collapse-btn';
+  nav.insertBefore(fold, nav.firstChild);
+  nav.querySelectorAll('.tab').forEach(function (t) { t.title = t.textContent.trim(); });
+  function setCollapsed(on) {
+    document.documentElement.classList.toggle('nav-collapsed', on);
+    fold.textContent = on ? '»' : '« Hide menu';
+    fold.setAttribute('aria-label', on ? 'Show the menu' : 'Hide the menu');
+    try { localStorage.setItem(COLLAPSE_KEY, on ? '1' : ''); } catch (e) { /* not kept */ }
+  }
+  var startCollapsed = false;
+  try { startCollapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch (e) { /* default open */ }
+  setCollapsed(startCollapsed);
+  fold.addEventListener('click', function () { setCollapsed(!document.documentElement.classList.contains('nav-collapsed')); });
 })();

@@ -25,6 +25,8 @@
     <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" data-tab="tabBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
+    <button type="button" role="tab" data-tab="tabLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
+    <button type="button" role="tab" data-tab="tabDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Documents</button>
     <button type="button" role="tab" data-tab="tabCreds" aria-controls="tabCreds" aria-selected="false" class="tab">App credentials</button>
     <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
@@ -144,6 +146,60 @@
     </section>
     <div class="projects-grid" id="tmProjList"></div>
     <p class="empty" id="tmProjEmpty">No projects yet.</p>
+  </main>
+
+  <!-- ===================== Company links ===================== -->
+  <main class="ideas-wrap" id="tabLinks" role="tabpanel" hidden>
+    <section class="card board-add" aria-label="Add a link">
+      <div class="card-head">
+        <h2>Company links</h2>
+        <span class="count-pill"><strong id="tmLinkCount">0</strong> links</span>
+      </div>
+      <form id="tmLinkForm" class="add board-form" autocomplete="off">
+        <input type="text" id="tmLinkTitle" maxlength="80" placeholder="Name, e.g. Instagram" aria-label="Link name" required>
+        <input type="text" id="tmLinkUrl" maxlength="500" placeholder="https://…" aria-label="Link address" required>
+        <input type="text" id="tmLinkGroup" maxlength="40" list="tmLinkGroups" placeholder="Group (optional)" aria-label="Group (optional)">
+        <datalist id="tmLinkGroups"></datalist>
+        <button type="submit">Add link</button>
+      </form>
+      <p class="form-msg" id="tmLinkMsg" role="status"></p>
+    </section>
+    <div class="links-grid" id="tmLinkList"></div>
+    <p class="empty" id="tmLinkEmpty">No links yet. Add websites, social pages, tools and drives here.</p>
+  </main>
+
+  <!-- ===================== Documents ===================== -->
+  <main class="layout docs-layout" id="tabDocs" role="tabpanel" hidden>
+    <section class="card" aria-label="Add a document">
+      <h2>Add a document</h2>
+      <p class="hint">Upload a file (up to 10 MB), save a link, or write a note. Files are kept in your private team data on GitHub.</p>
+      <form id="tmDocForm" class="video-form" autocomplete="off">
+        <label>Title
+          <input type="text" id="tmDocTitle" maxlength="120" placeholder="e.g. Company registration, Pitch deck" required>
+        </label>
+        <label>File (optional)
+          <input type="file" id="tmDocFile">
+        </label>
+        <label>Link (optional)
+          <input type="text" id="tmDocUrl" maxlength="500" placeholder="https://drive.google.com/…">
+        </label>
+        <label>Note (optional)
+          <textarea id="tmDocNote" rows="3" maxlength="5000" placeholder="Details, where the original is kept…"></textarea>
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="tmDocBtn">Save document</button>
+          <span class="form-msg" id="tmDocMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <section class="card" aria-label="Documents">
+      <div class="card-head">
+        <h2>Documents</h2>
+        <span class="count-pill"><strong id="tmDocCount">0</strong></span>
+      </div>
+      <ul class="board-list doc-list" id="tmDocList"></ul>
+      <p class="empty" id="tmDocEmpty">No documents yet.</p>
+    </section>
   </main>
 
   <!-- ===================== App credentials (encrypted vault) ===================== -->
