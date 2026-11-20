@@ -43,7 +43,9 @@
     boardForm: $('tmBoardForm'), boardText: $('tmBoardText'), boardOwner: $('tmBoardOwner'), boardDue: $('tmBoardDue'),
     board: { todo: $('tmBoardTodo'), doing: $('tmBoardDoing'), done: $('tmBoardDone') },
     boardCount: { todo: $('tmBoardTodoCount'), doing: $('tmBoardDoingCount'), done: $('tmBoardDoneCount') },
-    boardEmpty: { todo: $('tmBoardTodoEmpty'), doing: $('tmBoardDoingEmpty'), done: $('tmBoardDoneEmpty') }
+    boardEmpty: { todo: $('tmBoardTodoEmpty'), doing: $('tmBoardDoingEmpty'), done: $('tmBoardDoneEmpty') },
+    projForm: $('tmProjForm'), projName: $('tmProjName'), projNote: $('tmProjNote'),
+    projList: $('tmProjList'), projEmpty: $('tmProjEmpty'), projCount: $('tmProjCount')
   };
   if (!el.mine) return;
 
@@ -85,7 +87,8 @@
   function toOf(t) { return t.to || 'member'; }
 
   /* ---------------- state ---------------- */
-  var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus', 'stamps'];
+  var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
+    'projects', 'impl', 'remarks', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -100,8 +103,31 @@
   function stamp(key) { state.stamps[key] = Date.now(); }
   function save() { saveLocal(); scheduleSync(); }
 
+  // Starting list of projects. Seeded with the oldest possible stamp, so any real
+  // change (such as a delete) made on any device always wins over the seed.
+  var DEFAULT_PROJECTS = [
+    ['seed-stane-ai', 'Stane-AI'],
+    ['seed-staneai', 'StaneAi'],
+    ['seed-report-generator', 'Stane AI REPORT_GENRATOR'],
+    ['seed-lead-hunter', 'StaneAI-Lead-Hunter'],
+    ['seed-self-fix', 'Stane AI SELF-FIX']
+  ];
+  function seedProjects() {
+    var changed = false;
+    DEFAULT_PROJECTS.forEach(function (p, i) {
+      var key = 'p:' + p[0];
+      if (state.stamps[key]) return;
+      state.projects[p[0]] = { name: p[1], note: '', by: 'admin', created: i + 1 };
+      state.stamps[key] = 1;
+      changed = true;
+    });
+    if (changed) saveLocal();
+  }
+  seedProjects();
+
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
-  var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus' };
+  var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
+    p: 'projects', im: 'impl', r: 'remarks' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -120,6 +146,11 @@
     });
     Object.keys(s.done).forEach(function (id) { if (!s.tasks[id]) delete s.done[id]; });
     Object.keys(s.sharedStatus).forEach(function (id) { if (!s.shared[id]) delete s.sharedStatus[id]; });
+    Object.keys(s.impl).forEach(function (id) { if (!s.projects[s.impl[id].project]) delete s.impl[id]; });
+    Object.keys(s.remarks).forEach(function (id) {
+      var on = s.remarks[id].on;
+      if (!s.tasks[on] && !s.shared[on]) delete s.remarks[id];
+    });
     Object.keys(stamps).sort().forEach(function (k) { s.stamps[k] = stamps[k]; });
     return s;
   }
@@ -189,6 +220,7 @@
       note.textContent = t.note;
       body.appendChild(note);
     }
+    body.appendChild(remarksBlock(id));
     li.appendChild(body);
 
     if (fromOf(t) === ROLE || ROLE === 'admin') {
@@ -461,6 +493,7 @@
           row.appendChild(del);
         }
         li.appendChild(row);
+        li.appendChild(remarksBlock(id));
         list.appendChild(li);
       });
       if (el.boardCount[key]) el.boardCount[key].textContent = ids.length;
@@ -468,7 +501,217 @@
     });
   }
 
-  function render() { renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderNames(); }
+  /* ---------------- remarks (on assigned tasks and team tasks) ---------------- */
+  var openRemarks = {};   // which remark threads are expanded on this screen
+  var drafts = {};        // half-typed text in inputs that are rebuilt on every render
+  function draftInput(key, placeholder, label, maxlength) {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = maxlength;
+    input.placeholder = placeholder;
+    input.setAttribute('aria-label', label);
+    input.dataset.draft = key;
+    input.value = drafts[key] || '';
+    return input;
+  }
+  function remarkIds(on) {
+    return Object.keys(state.remarks).filter(function (id) { return state.remarks[id].on === on; })
+      .sort(function (a, b) { return state.remarks[a].created - state.remarks[b].created; });
+  }
+  function remarksBlock(on) {
+    var ids = remarkIds(on), open = !!openRemarks[on];
+    var wrap = document.createElement('div');
+    wrap.className = 'remarks';
+    wrap.dataset.on = on;
+
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'remark-toggle';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = open ? 'Hide remarks' : ids.length ? 'Remarks (' + ids.length + ')' : 'Add remark';
+    wrap.appendChild(toggle);
+    if (!open) return wrap;
+
+    if (ids.length) {
+      var list = document.createElement('ul');
+      list.className = 'remark-list';
+      ids.forEach(function (id) {
+        var r = state.remarks[id];
+        var li = document.createElement('li');
+        li.dataset.rid = id;
+        var head = document.createElement('div');
+        head.className = 'remark-head';
+        var who = document.createElement('strong');
+        who.className = 'remark-by ' + r.by;
+        who.textContent = nameOf(r.by);
+        var when = document.createElement('span');
+        when.textContent = shortStamp(r.created);
+        head.appendChild(who);
+        head.appendChild(when);
+        if (r.by === ROLE || ROLE === 'admin') {
+          var del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'del remark-del';
+          del.textContent = '✕';
+          del.setAttribute('aria-label', 'Delete remark');
+          head.appendChild(del);
+        }
+        var text = document.createElement('p');
+        text.className = 'remark-text';
+        text.textContent = r.text;
+        li.appendChild(head);
+        li.appendChild(text);
+        list.appendChild(li);
+      });
+      wrap.appendChild(list);
+    }
+
+    var form = document.createElement('form');
+    form.className = 'remark-form';
+    form.autocomplete = 'off';
+    form.appendChild(draftInput('r:' + on, 'Write a remark…', 'New remark', 500));
+    var send = document.createElement('button');
+    send.type = 'submit';
+    send.textContent = 'Add';
+    form.appendChild(send);
+    wrap.appendChild(form);
+    return wrap;
+  }
+  function dropRemarks(on) {
+    remarkIds(on).forEach(function (rid) { delete state.remarks[rid]; stamp('r:' + rid); });
+  }
+
+  /* ---------------- render: projects + new implementations ---------------- */
+  function implStatus(it) { return it.status === 'doing' || it.status === 'done' ? it.status : 'todo'; }
+  function delButton(cls, label) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'del ' + cls;
+    b.textContent = '✕';
+    b.setAttribute('aria-label', label);
+    return b;
+  }
+  function renderProjects() {
+    if (!el.projList) return;
+    var ids = Object.keys(state.projects).sort(function (a, b) {
+      return (state.projects[a].created || 0) - (state.projects[b].created || 0);
+    });
+    if (el.projCount) el.projCount.textContent = ids.length;
+    el.projList.textContent = '';
+    var order = { todo: 0, doing: 1, done: 2 };
+    ids.forEach(function (pid) {
+      var p = state.projects[pid];
+      var card = document.createElement('section');
+      card.className = 'card project-card';
+      card.dataset.id = pid;
+
+      var implIds = Object.keys(state.impl).filter(function (id) { return state.impl[id].project === pid; });
+      var openCount = implIds.filter(function (id) { return implStatus(state.impl[id]) !== 'done'; }).length;
+
+      var head = document.createElement('div');
+      head.className = 'card-head';
+      var h = document.createElement('h2');
+      h.textContent = p.name;
+      head.appendChild(h);
+      var right = document.createElement('div');
+      right.className = 'project-head-right';
+      var pill = document.createElement('span');
+      pill.className = 'count-pill';
+      var strong = document.createElement('strong');
+      strong.textContent = openCount;
+      pill.appendChild(strong);
+      pill.appendChild(document.createTextNode(' open'));
+      right.appendChild(pill);
+      if (p.by === ROLE || ROLE === 'admin') right.appendChild(delButton('project-del', 'Delete project: ' + p.name));
+      head.appendChild(right);
+      card.appendChild(head);
+      if (p.note) {
+        var note = document.createElement('p');
+        note.className = 'team-note';
+        note.textContent = p.note;
+        card.appendChild(note);
+      }
+
+      var sub = document.createElement('h3');
+      sub.textContent = 'New implementations';
+      card.appendChild(sub);
+
+      implIds.sort(function (a, b) {
+        var x = state.impl[a], y = state.impl[b];
+        return order[implStatus(x)] - order[implStatus(y)] || x.created - y.created;
+      });
+      if (implIds.length) {
+        var list = document.createElement('ul');
+        list.className = 'board-list impl-list';
+        implIds.forEach(function (iid) {
+          var it = state.impl[iid], key = implStatus(it);
+          var li = document.createElement('li');
+          li.className = 'board-item ' + key;
+          li.dataset.iid = iid;
+          var text = document.createElement('p');
+          text.className = 'board-text';
+          text.textContent = it.text;
+          li.appendChild(text);
+          var meta = document.createElement('div');
+          meta.className = 'team-meta';
+          meta.textContent = it.statusBy
+            ? nameOf(it.statusBy) + ' marked ' + statusLabel(key) + ' · ' + shortStamp(it.statusAt)
+            : 'Added by ' + nameOf(it.by) + ' · ' + shortStamp(it.created);
+          li.appendChild(meta);
+          var row = document.createElement('div');
+          row.className = 'board-actions';
+          var sel = document.createElement('select');
+          sel.className = 'status-select impl-status';
+          sel.setAttribute('aria-label', 'Status of: ' + it.text);
+          STATUSES.forEach(function (s) {
+            var o = document.createElement('option');
+            o.value = s[0];
+            o.textContent = s[1];
+            if (s[0] === key) o.selected = true;
+            sel.appendChild(o);
+          });
+          row.appendChild(sel);
+          if (it.by === ROLE || ROLE === 'admin') row.appendChild(delButton('impl-del', 'Delete: ' + it.text));
+          li.appendChild(row);
+          list.appendChild(li);
+        });
+        card.appendChild(list);
+      } else {
+        var empty = document.createElement('p');
+        empty.className = 'empty';
+        empty.textContent = 'Nothing added yet.';
+        card.appendChild(empty);
+      }
+
+      var form = document.createElement('form');
+      form.className = 'add impl-form';
+      form.autocomplete = 'off';
+      form.appendChild(draftInput('im:' + pid, 'What new can be added?', 'New implementation for ' + p.name, 300));
+      var add = document.createElement('button');
+      add.type = 'submit';
+      add.textContent = 'Add';
+      form.appendChild(add);
+      card.appendChild(form);
+
+      el.projList.appendChild(card);
+    });
+    if (el.projEmpty) el.projEmpty.hidden = ids.length > 0;
+  }
+
+  function render() {
+    // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
+    var act = document.activeElement;
+    var focusKey = act && act.dataset ? act.dataset.draft : '';
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderNames();
+    if (focusKey) {
+      var again = document.querySelector('[data-draft="' + focusKey + '"]');
+      if (again && again !== document.activeElement) {
+        again.focus();
+        var n = again.value.length;
+        again.setSelectionRange(n, n);
+      }
+    }
+  }
 
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
@@ -626,6 +869,7 @@
     render();
   }
   function onTaskClick(e) {
+    if (e.target.closest('.remarks')) return;
     var del = e.target.closest('.del');
     if (!del) return;
     var id = del.closest('li').dataset.id;
@@ -636,6 +880,7 @@
       delete state.done[id];
       stamp('t:' + id);
       stamp('d:' + id);
+      dropRemarks(id);
       save();
       render();
     });
@@ -820,6 +1065,7 @@
         render();
       });
       list.addEventListener('click', function (e) {
+        if (e.target.closest('.remarks')) return;
         var del = e.target.closest('.del');
         if (!del) return;
         var id = del.closest('li').dataset.id;
@@ -830,9 +1076,135 @@
           delete state.sharedStatus[id];
           stamp('s:' + id);
           stamp('ss:' + id);
+          dropRemarks(id);
           save();
           render();
         });
+      });
+    });
+  }
+
+  /* ---------------- events: remarks ---------------- */
+  document.addEventListener('input', function (e) {
+    var key = e.target.dataset && e.target.dataset.draft;
+    if (key) drafts[key] = e.target.value;
+  });
+  document.addEventListener('click', function (e) {
+    var wrap = e.target.closest('.remarks');
+    if (!wrap) return;
+    var on = wrap.dataset.on;
+    if (e.target.closest('.remark-toggle')) {
+      openRemarks[on] = !openRemarks[on];
+      render();
+      if (openRemarks[on]) {
+        var input = document.querySelector('[data-draft="r:' + on + '"]');
+        if (input) input.focus();
+      }
+      return;
+    }
+    var del = e.target.closest('.remark-del');
+    if (!del) return;
+    var rid = del.closest('li').dataset.rid;
+    var r = state.remarks[rid];
+    if (!r || (r.by !== ROLE && ROLE !== 'admin')) return;
+    armOrRun(del, function () {
+      delete state.remarks[rid];
+      stamp('r:' + rid);
+      save();
+      render();
+    });
+  });
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form.classList.contains('remark-form')) return;
+    e.preventDefault();
+    var on = form.closest('.remarks').dataset.on;
+    var input = form.querySelector('input');
+    var text = input.value.trim();
+    if (!text || (!state.tasks[on] && !state.shared[on])) return;
+    var id = newId();
+    state.remarks[id] = { on: on, by: ROLE, text: text, created: Date.now() };
+    stamp('r:' + id);
+    delete drafts['r:' + on];
+    input.value = '';
+    save();
+    render();
+  });
+
+  /* ---------------- events: projects ---------------- */
+  if (el.projForm) {
+    el.projForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = el.projName.value.trim();
+      if (!name) return;
+      var id = newId();
+      state.projects[id] = { name: name, note: el.projNote.value.trim(), by: ROLE, created: Date.now() };
+      stamp('p:' + id);
+      el.projName.value = '';
+      el.projNote.value = '';
+      save();
+      render();
+      el.projName.focus();
+    });
+  }
+  if (el.projList) {
+    el.projList.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!form.classList.contains('impl-form')) return;
+      e.preventDefault();
+      var pid = form.closest('.project-card').dataset.id;
+      var input = form.querySelector('input');
+      var text = input.value.trim();
+      if (!text || !state.projects[pid]) return;
+      var id = newId();
+      state.impl[id] = { project: pid, text: text, status: 'todo', by: ROLE, created: Date.now() };
+      stamp('im:' + id);
+      delete drafts['im:' + pid];
+      input.value = '';
+      save();
+      render();
+    });
+    el.projList.addEventListener('change', function (e) {
+      if (!e.target.classList.contains('impl-status')) return;
+      var iid = e.target.closest('li').dataset.iid;
+      var it = state.impl[iid];
+      if (!it) return;
+      var next = {};
+      Object.keys(it).forEach(function (k) { next[k] = it[k]; });
+      next.status = e.target.value === 'doing' || e.target.value === 'done' ? e.target.value : 'todo';
+      next.statusBy = ROLE;
+      next.statusAt = Date.now();
+      state.impl[iid] = next;
+      stamp('im:' + iid);
+      save();
+      render();
+    });
+    el.projList.addEventListener('click', function (e) {
+      var del = e.target.closest('.impl-del, .project-del');
+      if (!del) return;
+      if (del.classList.contains('impl-del')) {
+        var iid = del.closest('li').dataset.iid;
+        var it = state.impl[iid];
+        if (!it || (it.by !== ROLE && ROLE !== 'admin')) return;
+        armOrRun(del, function () {
+          delete state.impl[iid];
+          stamp('im:' + iid);
+          save();
+          render();
+        });
+        return;
+      }
+      var pid = del.closest('.project-card').dataset.id;
+      var p = state.projects[pid];
+      if (!p || (p.by !== ROLE && ROLE !== 'admin')) return;
+      armOrRun(del, function () {
+        Object.keys(state.impl).forEach(function (iid) {
+          if (state.impl[iid].project === pid) { delete state.impl[iid]; stamp('im:' + iid); }
+        });
+        delete state.projects[pid];
+        stamp('p:' + pid);
+        save();
+        render();
       });
     });
   }

@@ -24,6 +24,7 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" data-tab="tabBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
+    <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
     <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <span class="sync-chip off" id="tmChip">Not connected</span>
@@ -124,6 +125,24 @@
         <p class="empty" id="tmBoardDoneEmpty">Nothing here.</p>
       </section>
     </div>
+  </main>
+
+  <!-- ===================== Projects ===================== -->
+  <main class="ideas-wrap" id="tabProjects" role="tabpanel" hidden>
+    <section class="card board-add" aria-label="Add a project">
+      <div class="card-head">
+        <h2>Projects</h2>
+        <span class="count-pill"><strong id="tmProjCount">0</strong> projects</span>
+      </div>
+      <p class="hint">Add what new can be implemented in each project. Both of you can add ideas and change their status.</p>
+      <form id="tmProjForm" class="add board-form" autocomplete="off">
+        <input type="text" id="tmProjName" maxlength="80" placeholder="New project name" aria-label="New project name" required>
+        <input type="text" id="tmProjNote" maxlength="200" placeholder="Short note (optional)" aria-label="Short note (optional)">
+        <button type="submit">Add project</button>
+      </form>
+    </section>
+    <div class="projects-grid" id="tmProjList"></div>
+    <p class="empty" id="tmProjEmpty">No projects yet.</p>
   </main>
 
   <!-- ===================== Ideas ===================== -->
