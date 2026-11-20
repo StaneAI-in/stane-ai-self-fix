@@ -103,22 +103,34 @@
   function stamp(key) { state.stamps[key] = Date.now(); }
   function save() { saveLocal(); scheduleSync(); }
 
-  // Starting list of projects. Seeded with the oldest possible stamp, so any real
-  // change (such as a delete) made on any device always wins over the seed.
+  // Starting list of projects. Seeded with a tiny stamp, so any real change (an edit
+  // or a delete) made on any device always wins over the seed. Raise SEED_STAMP when
+  // the seed text changes, so untouched seeds pick up the new text.
+  var SEED_STAMP = 2;
   var DEFAULT_PROJECTS = [
-    ['seed-stane-ai', 'Stane-AI'],
-    ['seed-staneai', 'StaneAi'],
-    ['seed-report-generator', 'Stane AI REPORT_GENRATOR'],
-    ['seed-lead-hunter', 'StaneAI-Lead-Hunter'],
-    ['seed-self-fix', 'Stane AI SELF-FIX']
+    ['seed-stane-ai', 'Stane-AI',
+      'StaneAI Model Arena: a local Windows desktop AI chat app (Python + PySide6). The interface is built; ' +
+      'connecting AI providers (Ollama, Gemini, OpenRouter) is the next step.'],
+    ['seed-staneai', 'StaneAi',
+      'The StaneAI company website: a responsive dark-theme landing page in plain HTML, CSS and JavaScript, ' +
+      'with service pages and a blog.'],
+    ['seed-report-generator', 'Stane AI REPORT_GENRATOR',
+      'AI report generator (FastAPI): several connected AIs and APIs gather raw material on a topic, then a ' +
+      'final AI writes a fixed-format report with summary, key findings, sentiment, trends and hashtags, exported as PDF.'],
+    ['seed-lead-hunter', 'StaneAI-Lead-Hunter',
+      'Finds freelance and contract software-development leads every few hours from free sources (job boards, ' +
+      'Hacker News, alert emails, web search), has AI qualify them, and shows them in a dashboard to review and pitch.'],
+    ['seed-self-fix', 'Stane AI SELF-FIX',
+      'This app: personal calendar, daily tasks, streaks and English practice, plus the shared team space ' +
+      'for tasks, ideas, expenses and projects.']
   ];
   function seedProjects() {
     var changed = false;
     DEFAULT_PROJECTS.forEach(function (p, i) {
       var key = 'p:' + p[0];
-      if (state.stamps[key]) return;
-      state.projects[p[0]] = { name: p[1], note: '', by: 'admin', created: i + 1 };
-      state.stamps[key] = 1;
+      if ((Number(state.stamps[key]) || 0) >= SEED_STAMP) return;
+      state.projects[p[0]] = { name: p[1], note: p[2], by: 'admin', created: i + 1 };
+      state.stamps[key] = SEED_STAMP;
       changed = true;
     });
     if (changed) saveLocal();
@@ -591,6 +603,49 @@
     b.setAttribute('aria-label', label);
     return b;
   }
+  var editingDesc = {};   // projects whose description is being edited on this screen
+  function descBlock(pid, p) {
+    var wrap = document.createElement('div');
+    wrap.className = 'project-desc';
+    if (editingDesc[pid]) {
+      var form = document.createElement('form');
+      form.className = 'desc-form';
+      form.autocomplete = 'off';
+      var area = document.createElement('textarea');
+      area.rows = 3;
+      area.maxLength = 1000;
+      area.placeholder = 'What is this project about?';
+      area.setAttribute('aria-label', 'Description of ' + p.name);
+      area.dataset.draft = 'pd:' + pid;
+      area.value = drafts['pd:' + pid] !== undefined ? drafts['pd:' + pid] : (p.note || '');
+      form.appendChild(area);
+      var row = document.createElement('div');
+      row.className = 'form-row';
+      var saveBtn = document.createElement('button');
+      saveBtn.type = 'submit';
+      saveBtn.className = 'primary-btn';
+      saveBtn.textContent = 'Save';
+      var cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'ghost-btn desc-cancel';
+      cancel.textContent = 'Cancel';
+      row.appendChild(saveBtn);
+      row.appendChild(cancel);
+      form.appendChild(row);
+      wrap.appendChild(form);
+      return wrap;
+    }
+    var text = document.createElement('p');
+    text.className = p.note ? 'desc-text' : 'desc-text empty-desc';
+    text.textContent = p.note || 'No description yet.';
+    wrap.appendChild(text);
+    var edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'remark-toggle desc-edit';
+    edit.textContent = p.note ? 'Edit description' : 'Add description';
+    wrap.appendChild(edit);
+    return wrap;
+  }
   function renderProjects() {
     if (!el.projList) return;
     var ids = Object.keys(state.projects).sort(function (a, b) {
@@ -625,12 +680,7 @@
       if (p.by === ROLE || ROLE === 'admin') right.appendChild(delButton('project-del', 'Delete project: ' + p.name));
       head.appendChild(right);
       card.appendChild(head);
-      if (p.note) {
-        var note = document.createElement('p');
-        note.className = 'team-note';
-        note.textContent = p.note;
-        card.appendChild(note);
-      }
+      card.appendChild(descBlock(pid, p));
 
       var sub = document.createElement('h3');
       sub.textContent = 'New implementations';
@@ -1150,6 +1200,22 @@
   if (el.projList) {
     el.projList.addEventListener('submit', function (e) {
       var form = e.target;
+      if (form.classList.contains('desc-form')) {
+        e.preventDefault();
+        var dpid = form.closest('.project-card').dataset.id;
+        var proj = state.projects[dpid];
+        if (!proj) return;
+        var next = {};
+        Object.keys(proj).forEach(function (k) { next[k] = proj[k]; });
+        next.note = form.querySelector('textarea').value.trim();
+        state.projects[dpid] = next;
+        stamp('p:' + dpid);
+        delete editingDesc[dpid];
+        delete drafts['pd:' + dpid];
+        save();
+        render();
+        return;
+      }
       if (!form.classList.contains('impl-form')) return;
       e.preventDefault();
       var pid = form.closest('.project-card').dataset.id;
@@ -1180,6 +1246,17 @@
       render();
     });
     el.projList.addEventListener('click', function (e) {
+      var descBtn = e.target.closest('.desc-edit, .desc-cancel');
+      if (descBtn) {
+        var dpid = descBtn.closest('.project-card').dataset.id;
+        delete drafts['pd:' + dpid];
+        if (descBtn.classList.contains('desc-edit')) editingDesc[dpid] = true;
+        else delete editingDesc[dpid];
+        render();
+        var area = document.querySelector('[data-draft="pd:' + dpid + '"]');
+        if (area) { area.focus(); area.setSelectionRange(area.value.length, area.value.length); }
+        return;
+      }
       var del = e.target.closest('.impl-del, .project-del');
       if (!del) return;
       if (del.classList.contains('impl-del')) {

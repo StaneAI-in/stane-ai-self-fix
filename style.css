@@ -524,3 +524,19 @@ html.locked body > *:not(#loginGate) { display: none !important; }
   font-weight: 600;
   font-size: 0.85rem;
 }
+
+/* ---------- Project descriptions ---------- */
+.project-desc { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.desc-text { margin: 0; font-size: 0.92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.desc-text.empty-desc { color: var(--muted); font-style: italic; }
+.desc-form { display: flex; flex-direction: column; gap: 8px; }
+.desc-form textarea {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.desc-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
