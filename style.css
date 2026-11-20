@@ -540,3 +540,64 @@ html.locked body > *:not(#loginGate) { display: none !important; }
   resize: vertical;
 }
 .desc-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* ---------- Project details: type tag, links, progress ---------- */
+.project-tag {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.project-tag.desktop { background: var(--streak-soft); color: var(--streak); }
+.project-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.project-link {
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 10px;
+  color: var(--accent);
+  background: var(--cell);
+  text-decoration: none;
+}
+a.project-link:hover { border-color: var(--accent); }
+.project-link.muted { color: var(--muted); font-weight: 400; }
+.project-progress { margin-top: 8px; }
+.project-desc .progress-text { margin-top: 4px; }
+
+/* ---------- App credentials ---------- */
+#tabCreds { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+.vault-chip.open { color: var(--done); border-color: var(--done); }
+.vault-chip.shut { color: var(--muted); }
+.cred-list { margin-bottom: 8px; }
+.cred-title { color: var(--text); font-size: 0.92rem; overflow-wrap: anywhere; }
+.cred-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }
+.cred-key { color: var(--muted); min-width: 48px; }
+.cred-val {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.82rem;
+}
+.mini-btn {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.mini-btn:hover { border-color: var(--accent); }
+@media (max-width: 860px) {
+  #tabCreds { grid-template-columns: minmax(0, 1fr); }
+}

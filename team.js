@@ -88,7 +88,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -106,10 +106,20 @@
   // Starting list of projects. Seeded with a tiny stamp, so any real change (an edit
   // or a delete) made on any device always wins over the seed. Raise SEED_STAMP when
   // the seed text changes, so untouched seeds pick up the new text.
-  var SEED_STAMP = 2;
+  var SEED_STAMP = 3;       // projects
+  var IMPL_SEED_STAMP = 3;  // implementation ideas
+  var GH = 'https://github.com/divyanshu7588/';
+  // id -> [type tag, repo link, live link]
+  var DEFAULT_LINKS = {
+    'seed-stane-ai': ['Desktop app', GH + 'staneai-model-arena', ''],
+    'seed-staneai': ['Website', GH + 'StaneAi-website', 'https://staneai.in'],
+    'seed-report-generator': ['Web app', '', ''],
+    'seed-lead-hunter': ['Web app', GH + 'StaneAi-Lead_hunter', ''],
+    'seed-self-fix': ['Web app', GH + 'stane-ai-self-fix', 'https://divyanshu7588.github.io/stane-ai-self-fix/']
+  };
   var DEFAULT_PROJECTS = [
     ['seed-stane-ai', 'Stane-AI',
-      'StaneAI Model Arena: a local Windows desktop AI chat app (Python + PySide6). The interface is built; ' +
+      'StaneAI Model Arena (desktop app): a local Windows desktop AI chat app (Python + PySide6). The interface is built; ' +
       'connecting AI providers (Ollama, Gemini, OpenRouter) is the next step.'],
     ['seed-staneai', 'StaneAi',
       'The StaneAI company website: a responsive dark-theme landing page in plain HTML, CSS and JavaScript, ' +
@@ -157,7 +167,7 @@
     'seed-self-fix': [
       'Browser / phone reminders for tasks that are due',
       'Weekly summary of streaks, finished tasks and expenses',
-      'Progress bar on each project from its implementation statuses',
+      ['Progress bar on each project from its implementation statuses', 'done'],
       'Install on the phone as an app (PWA) with offline use',
       'Monthly expense chart'
     ]
@@ -167,17 +177,19 @@
     DEFAULT_PROJECTS.forEach(function (p, i) {
       var key = 'p:' + p[0];
       if ((Number(state.stamps[key]) || 0) >= SEED_STAMP) return;
-      state.projects[p[0]] = { name: p[1], note: p[2], by: 'admin', created: i + 1 };
+      var l = DEFAULT_LINKS[p[0]] || ['', '', ''];
+      state.projects[p[0]] = { name: p[1], note: p[2], tag: l[0], repo: l[1], live: l[2], by: 'admin', created: i + 1 };
       state.stamps[key] = SEED_STAMP;
       changed = true;
     });
     Object.keys(DEFAULT_IMPL).forEach(function (pid) {
       if (!state.projects[pid]) return; // project was deleted
-      DEFAULT_IMPL[pid].forEach(function (text, i) {
+      DEFAULT_IMPL[pid].forEach(function (item, i) {
+        var text = Array.isArray(item) ? item[0] : item, status = Array.isArray(item) ? item[1] : 'todo';
         var id = 'seed-im-' + pid.slice(5) + '-' + (i + 1), key = 'im:' + id;
-        if ((Number(state.stamps[key]) || 0) >= SEED_STAMP) return;
-        state.impl[id] = { project: pid, text: text, status: 'todo', by: 'admin', created: i + 1 };
-        state.stamps[key] = SEED_STAMP;
+        if ((Number(state.stamps[key]) || 0) >= IMPL_SEED_STAMP) return;
+        state.impl[id] = { project: pid, text: text, status: status, by: 'admin', created: i + 1 };
+        state.stamps[key] = IMPL_SEED_STAMP;
         changed = true;
       });
     });
@@ -187,7 +199,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -651,22 +663,55 @@
     b.setAttribute('aria-label', label);
     return b;
   }
-  var editingDesc = {};   // projects whose description is being edited on this screen
-  function descBlock(pid, p) {
+  var editingDesc = {};   // projects whose details are being edited on this screen
+  var DETAIL_FIELDS = ['note', 'tag', 'repo', 'live'];
+  // Links come from synced data, so only plain web links are ever turned into <a href>.
+  function safeUrl(u) {
+    u = String(u || '').trim();
+    if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    try {
+      var x = new URL(u);
+      return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : '';
+    } catch (e) { return ''; }
+  }
+  function clearDetailDrafts(pid) {
+    DETAIL_FIELDS.forEach(function (f) { delete drafts['pd:' + pid + ':' + f]; });
+  }
+  function detailField(pid, p, field, labelText, tagName, placeholder, maxlength) {
+    var label = document.createElement('label');
+    label.textContent = labelText;
+    var input = document.createElement(tagName);
+    if (tagName === 'textarea') input.rows = 3; else input.type = 'text';
+    input.name = field;
+    input.maxLength = maxlength;
+    input.placeholder = placeholder;
+    var key = 'pd:' + pid + ':' + field;
+    input.dataset.draft = key;
+    input.value = drafts[key] !== undefined ? drafts[key] : (p[field] || '');
+    label.appendChild(input);
+    return label;
+  }
+  function linkChip(url, text) {
+    var a = document.createElement('a');
+    a.className = 'project-link';
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = text + ' ↗';
+    return a;
+  }
+  function detailsBlock(pid, p) {
     var wrap = document.createElement('div');
     wrap.className = 'project-desc';
     if (editingDesc[pid]) {
       var form = document.createElement('form');
-      form.className = 'desc-form';
+      form.className = 'desc-form video-form';
       form.autocomplete = 'off';
-      var area = document.createElement('textarea');
-      area.rows = 3;
-      area.maxLength = 1000;
-      area.placeholder = 'What is this project about?';
-      area.setAttribute('aria-label', 'Description of ' + p.name);
-      area.dataset.draft = 'pd:' + pid;
-      area.value = drafts['pd:' + pid] !== undefined ? drafts['pd:' + pid] : (p.note || '');
-      form.appendChild(area);
+      form.appendChild(detailField(pid, p, 'note', 'Description', 'textarea', 'What is this project about?', 1000));
+      form.appendChild(detailField(pid, p, 'tag', 'Type', 'input', 'e.g. Desktop app, Web app, Website', 30));
+      form.appendChild(detailField(pid, p, 'repo', 'Repository link', 'input', 'https://github.com/…', 300));
+      form.appendChild(detailField(pid, p, 'live', 'Live link', 'input', 'https://…', 300));
       var row = document.createElement('div');
       row.className = 'form-row';
       var saveBtn = document.createElement('button');
@@ -687,10 +732,51 @@
     text.className = p.note ? 'desc-text' : 'desc-text empty-desc';
     text.textContent = p.note || 'No description yet.';
     wrap.appendChild(text);
+
+    var links = document.createElement('div');
+    links.className = 'project-links';
+    var repo = safeUrl(p.repo), live = safeUrl(p.live);
+    if (repo) links.appendChild(linkChip(repo, 'Repo'));
+    if (live) links.appendChild(linkChip(live, 'Live'));
+    if (!live && /desktop/i.test(p.tag || '')) {
+      var desk = document.createElement('span');
+      desk.className = 'project-link muted';
+      desk.textContent = 'Runs on the desktop, no live link';
+      links.appendChild(desk);
+    }
+    if (links.childNodes.length) wrap.appendChild(links);
+
+    // Progress: done implementations out of all of them; "in progress" counts half.
+    var items = Object.keys(state.impl).filter(function (id) { return state.impl[id].project === pid; });
+    var done = 0, doing = 0;
+    items.forEach(function (id) {
+      var st = implStatus(state.impl[id]);
+      if (st === 'done') done++; else if (st === 'doing') doing++;
+    });
+    var pct = items.length ? Math.round(((done + doing / 2) / items.length) * 100) : 0;
+    var bar = document.createElement('div');
+    bar.className = 'progress project-progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(pct));
+    bar.setAttribute('aria-label', 'Progress of ' + p.name);
+    var fill = document.createElement('div');
+    fill.className = 'progress-bar';
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    wrap.appendChild(bar);
+    var ptext = document.createElement('p');
+    ptext.className = 'progress-text';
+    ptext.textContent = items.length
+      ? pct + '% · ' + done + ' of ' + items.length + ' done' + (doing ? ', ' + doing + ' in progress' : '')
+      : 'No implementations yet';
+    wrap.appendChild(ptext);
+
     var edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'remark-toggle desc-edit';
-    edit.textContent = p.note ? 'Edit description' : 'Add description';
+    edit.textContent = 'Edit details';
     wrap.appendChild(edit);
     return wrap;
   }
@@ -715,6 +801,12 @@
       head.className = 'card-head';
       var h = document.createElement('h2');
       h.textContent = p.name;
+      if (p.tag) {
+        var tag = document.createElement('span');
+        tag.className = 'project-tag' + (/desktop/i.test(p.tag) ? ' desktop' : '');
+        tag.textContent = p.tag;
+        h.appendChild(tag);
+      }
       head.appendChild(h);
       var right = document.createElement('div');
       right.className = 'project-head-right';
@@ -728,7 +820,7 @@
       if (p.by === ROLE || ROLE === 'admin') right.appendChild(delButton('project-del', 'Delete project: ' + p.name));
       head.appendChild(right);
       card.appendChild(head);
-      card.appendChild(descBlock(pid, p));
+      card.appendChild(detailsBlock(pid, p));
 
       var sub = document.createElement('h3');
       sub.textContent = 'New implementations';
@@ -800,7 +892,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderNames();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderNames();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -1255,11 +1347,15 @@
         if (!proj) return;
         var next = {};
         Object.keys(proj).forEach(function (k) { next[k] = proj[k]; });
-        next.note = form.querySelector('textarea').value.trim();
+        var f = form.elements;
+        next.note = f.note.value.trim();
+        next.tag = f.tag.value.trim().slice(0, 30);
+        next.repo = safeUrl(f.repo.value);
+        next.live = safeUrl(f.live.value);
         state.projects[dpid] = next;
         stamp('p:' + dpid);
         delete editingDesc[dpid];
-        delete drafts['pd:' + dpid];
+        clearDetailDrafts(dpid);
         save();
         render();
         return;
@@ -1297,11 +1393,11 @@
       var descBtn = e.target.closest('.desc-edit, .desc-cancel');
       if (descBtn) {
         var dpid = descBtn.closest('.project-card').dataset.id;
-        delete drafts['pd:' + dpid];
+        clearDetailDrafts(dpid);
         if (descBtn.classList.contains('desc-edit')) editingDesc[dpid] = true;
         else delete editingDesc[dpid];
         render();
-        var area = document.querySelector('[data-draft="pd:' + dpid + '"]');
+        var area = document.querySelector('[data-draft="pd:' + dpid + ':note"]');
         if (area) { area.focus(); area.setSelectionRange(area.value.length, area.value.length); }
         return;
       }
@@ -1330,6 +1426,317 @@
         stamp('p:' + pid);
         save();
         render();
+      });
+    });
+  }
+
+  /* ---------------- app credentials (encrypted vault) ---------------- */
+  // Every credential is encrypted in the browser (AES-GCM, key from the vault password
+  // via PBKDF2) before it is saved or synced. Only the scrambled data ever leaves the
+  // device; the password and the key are never stored anywhere.
+  var VAULT_ITER = 600000;
+  var VAULT_IDLE_MS = 15 * 60 * 1000;
+  var vault = { key: null, salt: '', plain: {}, failed: {}, shown: {}, busy: false, timer: null };
+  var cv = {
+    stateChip: $('tmVaultState'), hint: $('tmVaultHint'), form: $('tmVaultForm'), pass: $('tmVaultPass'),
+    pass2Wrap: $('tmVaultPass2Wrap'), pass2: $('tmVaultPass2'), btn: $('tmVaultBtn'), msg: $('tmVaultMsg'),
+    lockRow: $('tmVaultLockRow'), lock: $('tmVaultLock'), addCard: $('tmCredAddCard'), credForm: $('tmCredForm'),
+    project: $('tmCredProject'), title: $('tmCredTitle'), login: $('tmCredLogin'), secret: $('tmCredSecret'),
+    note: $('tmCredNote'), credMsg: $('tmCredMsg'), list: $('tmCredList'), empty: $('tmCredEmpty'), count: $('tmCredCount')
+  };
+  var hasCrypto = !!(window.crypto && crypto.subtle && window.TextEncoder);
+
+  function bytesToB64(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    return btoa(bin);
+  }
+  function b64ToBytes(b64) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function vaultKey(pass, saltB64, iter) {
+    var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: b64ToBytes(saltB64), iterations: iter, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(key, obj) {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+    return { iv: bytesToB64(iv), ct: bytesToB64(new Uint8Array(ct)) };
+  }
+  async function unseal(key, box) {
+    var pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(box.iv) }, key, b64ToBytes(box.ct));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  function vaultMeta() {
+    var m = state.vaultMeta.main;
+    return m && m.salt && m.check ? m : null;
+  }
+
+  function lockVault(reason) {
+    vault.key = null;
+    vault.salt = '';
+    vault.plain = {};
+    vault.failed = {};
+    vault.shown = {};
+    clearTimeout(vault.timer);
+    if (cv.msg && reason) { cv.msg.textContent = reason; cv.msg.className = 'form-msg'; }
+    renderCreds();
+  }
+  function touchVault() {
+    if (!vault.key) return;
+    clearTimeout(vault.timer);
+    vault.timer = setTimeout(function () { lockVault('Locked after 15 minutes without use.'); }, VAULT_IDLE_MS);
+  }
+  async function decryptMissing() {
+    if (!vault.key || vault.busy) return;
+    var todo = Object.keys(state.vault).filter(function (id) { return !vault.plain[id] && !vault.failed[id]; });
+    if (!todo.length) return;
+    vault.busy = true;
+    var key = vault.key;
+    for (var i = 0; i < todo.length; i++) {
+      var id = todo[i], item = state.vault[id];
+      try { vault.plain[id] = await unseal(key, item.box); }
+      catch (e) { vault.failed[id] = true; }
+    }
+    vault.busy = false;
+    if (vault.key === key) renderCreds();
+  }
+
+  function credLine(id, label, value, field, secret) {
+    var row = document.createElement('div');
+    row.className = 'cred-line';
+    var k = document.createElement('span');
+    k.className = 'cred-key';
+    k.textContent = label;
+    var v = document.createElement('code');
+    v.className = 'cred-val';
+    v.textContent = secret && !vault.shown[id] ? '••••••••••' : value;
+    row.appendChild(k);
+    row.appendChild(v);
+    if (secret) {
+      var show = document.createElement('button');
+      show.type = 'button';
+      show.className = 'mini-btn cred-show';
+      show.textContent = vault.shown[id] ? 'Hide' : 'Show';
+      row.appendChild(show);
+    }
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'mini-btn cred-copy';
+    copy.dataset.field = field;
+    copy.textContent = 'Copy';
+    row.appendChild(copy);
+    return row;
+  }
+
+  function renderCreds() {
+    if (!cv || !cv.list) return;
+    var meta = vaultMeta();
+    if (vault.key && (!meta || meta.salt !== vault.salt)) { lockVault('The vault password was changed on another device. Unlock again.'); return; }
+    var unlocked = !!vault.key;
+    var ids = Object.keys(state.vault);
+    cv.count.textContent = ids.length;
+
+    cv.stateChip.textContent = unlocked ? 'Unlocked' : 'Locked';
+    cv.stateChip.className = 'count-pill vault-chip ' + (unlocked ? 'open' : 'shut');
+    cv.form.hidden = unlocked;
+    cv.lockRow.hidden = !unlocked;
+    cv.addCard.hidden = !unlocked;
+    cv.pass2Wrap.hidden = !!meta;
+    cv.pass2.required = !meta;
+    cv.btn.textContent = meta ? 'Unlock' : 'Create vault';
+    if (!hasCrypto) {
+      cv.hint.textContent = 'This browser cannot encrypt here. Open the site over https (the GitHub Pages link) to use the vault.';
+      cv.btn.disabled = true;
+    } else if (unlocked) {
+      cv.hint.textContent = 'Values are encrypted on this device before they sync. The vault locks itself after 15 minutes without use.';
+    } else if (meta) {
+      cv.hint.textContent = 'Enter the vault password to see or add credentials. Both of you use the same vault password.';
+    } else {
+      cv.hint.textContent = 'Create a vault password (8+ characters) and give it to your partner privately. ' +
+        'Everything is encrypted with it before syncing, so GitHub only sees scrambled data. ' +
+        'If the password is forgotten, the saved values cannot be recovered.';
+    }
+
+    // Project choices in the add form.
+    if (cv.project && document.activeElement !== cv.project) {
+      var chosen = cv.project.value;
+      cv.project.textContent = '';
+      var general = document.createElement('option');
+      general.value = '';
+      general.textContent = 'General (no project)';
+      cv.project.appendChild(general);
+      Object.keys(state.projects).sort(function (a, b) {
+        return (state.projects[a].created || 0) - (state.projects[b].created || 0);
+      }).forEach(function (pid) {
+        var o = document.createElement('option');
+        o.value = pid;
+        o.textContent = state.projects[pid].name;
+        cv.project.appendChild(o);
+      });
+      cv.project.value = chosen && state.projects[chosen] ? chosen : '';
+    }
+
+    cv.list.textContent = '';
+    if (!unlocked) {
+      cv.empty.hidden = false;
+      cv.empty.textContent = ids.length ? 'Unlock the vault to see ' + ids.length + ' saved credential' + (ids.length === 1 ? '' : 's') + '.' : 'No credentials saved yet.';
+      return;
+    }
+    decryptMissing();
+    cv.empty.textContent = 'No credentials saved yet.';
+    cv.empty.hidden = ids.length > 0;
+
+    // Group by project, in project order; credentials of deleted projects fall under General.
+    var groups = {};
+    ids.forEach(function (id) {
+      var pid = state.vault[id].project;
+      var g = pid && state.projects[pid] ? pid : '';
+      (groups[g] = groups[g] || []).push(id);
+    });
+    var order = Object.keys(groups).sort(function (a, b) {
+      if (!a) return 1;
+      if (!b) return -1;
+      return (state.projects[a].created || 0) - (state.projects[b].created || 0);
+    });
+    order.forEach(function (g) {
+      var h = document.createElement('h3');
+      h.textContent = g ? state.projects[g].name : 'General';
+      cv.list.appendChild(h);
+      var ul = document.createElement('ul');
+      ul.className = 'board-list cred-list';
+      groups[g].sort(function (a, b) { return state.vault[a].created - state.vault[b].created; }).forEach(function (id) {
+        var item = state.vault[id], c = vault.plain[id];
+        var li = document.createElement('li');
+        li.className = 'board-item cred-item';
+        li.dataset.id = id;
+        var head = document.createElement('div');
+        head.className = 'remark-head';
+        var t = document.createElement('strong');
+        t.className = 'cred-title';
+        t.textContent = c ? c.title : vault.failed[id] ? 'Cannot be opened with this password' : 'Opening…';
+        head.appendChild(t);
+        var when = document.createElement('span');
+        when.textContent = nameOf(item.by) + ' · ' + shortStamp(item.created);
+        head.appendChild(when);
+        if (item.by === ROLE || ROLE === 'admin') head.appendChild(delButton('cred-del', 'Delete credential'));
+        li.appendChild(head);
+        if (c) {
+          if (c.login) li.appendChild(credLine(id, 'User', c.login, 'login', false));
+          li.appendChild(credLine(id, 'Secret', c.secret, 'secret', true));
+          if (c.note) {
+            var n = document.createElement('p');
+            n.className = 'team-note';
+            n.textContent = c.note;
+            li.appendChild(n);
+          }
+        }
+        ul.appendChild(li);
+      });
+      cv.list.appendChild(ul);
+    });
+  }
+
+  function setVaultMsg(text, kind) { cv.msg.textContent = text; cv.msg.className = 'form-msg' + (kind ? ' ' + kind : ''); }
+  if (cv.form) {
+    cv.form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (!hasCrypto) return;
+      var pass = cv.pass.value;
+      var meta = vaultMeta();
+      if (!meta) {
+        if (pass.length < 8) { setVaultMsg('Use at least 8 characters.', 'error'); return; }
+        if (pass !== cv.pass2.value) { setVaultMsg('The two passwords do not match.', 'error'); return; }
+      }
+      cv.btn.disabled = true;
+      setVaultMsg(meta ? 'Unlocking…' : 'Creating…');
+      try {
+        if (meta) {
+          var key = await vaultKey(pass, meta.salt, meta.iter || VAULT_ITER);
+          try { await unseal(key, meta.check); }
+          catch (err) { setVaultMsg('Wrong password.', 'error'); cv.btn.disabled = false; return; }
+          vault.key = key;
+          vault.salt = meta.salt;
+        } else {
+          var salt = bytesToB64(crypto.getRandomValues(new Uint8Array(16)));
+          var newKey = await vaultKey(pass, salt, VAULT_ITER);
+          state.vaultMeta.main = { salt: salt, iter: VAULT_ITER, check: await seal(newKey, { ok: 'stane-vault' }), by: ROLE, created: Date.now() };
+          stamp('vm:main');
+          save();
+          vault.key = newKey;
+          vault.salt = salt;
+        }
+        cv.pass.value = '';
+        cv.pass2.value = '';
+        setVaultMsg('');
+        touchVault();
+      } catch (err) {
+        setVaultMsg('Could not open the vault in this browser.', 'error');
+      }
+      cv.btn.disabled = false;
+      renderCreds();
+    });
+    cv.lock.addEventListener('click', function () { lockVault(''); });
+    document.addEventListener('pointerdown', touchVault);
+    document.addEventListener('keydown', touchVault);
+
+    cv.credForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (!vault.key) return;
+      var title = cv.title.value.trim(), secret = cv.secret.value;
+      if (!title || !secret) return;
+      var data = { title: title, login: cv.login.value.trim(), secret: secret, note: cv.note.value.trim() };
+      try {
+        var box = await seal(vault.key, data);
+        var id = newId();
+        state.vault[id] = { project: cv.project.value || '', box: box, by: ROLE, created: Date.now() };
+        vault.plain[id] = data;
+        stamp('v:' + id);
+        cv.title.value = '';
+        cv.login.value = '';
+        cv.secret.value = '';
+        cv.note.value = '';
+        save();
+        renderCreds();
+        cv.credMsg.textContent = 'Saved (encrypted).';
+        cv.credMsg.className = 'form-msg ok';
+        cv.title.focus();
+      } catch (err) {
+        cv.credMsg.textContent = 'Could not encrypt it. Nothing was saved.';
+        cv.credMsg.className = 'form-msg error';
+      }
+    });
+
+    cv.list.addEventListener('click', function (e) {
+      var li = e.target.closest('li.cred-item');
+      if (!li) return;
+      var id = li.dataset.id, c = vault.plain[id];
+      if (e.target.closest('.cred-show')) { vault.shown[id] = !vault.shown[id]; renderCreds(); return; }
+      var copy = e.target.closest('.cred-copy');
+      if (copy && c) {
+        var value = copy.dataset.field === 'login' ? c.login : c.secret;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(value).then(function () {
+            copy.textContent = 'Copied';
+            setTimeout(function () { if (copy.isConnected) copy.textContent = 'Copy'; }, 1500);
+          }, function () { copy.textContent = 'Failed'; });
+        }
+        return;
+      }
+      var del = e.target.closest('.cred-del');
+      if (!del) return;
+      var item = state.vault[id];
+      if (!item || (item.by !== ROLE && ROLE !== 'admin')) return;
+      armOrRun(del, function () {
+        delete state.vault[id];
+        delete vault.plain[id];
+        stamp('v:' + id);
+        save();
+        renderCreds();
       });
     });
   }

@@ -25,6 +25,7 @@
     <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" data-tab="tabBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
+    <button type="button" role="tab" data-tab="tabCreds" aria-controls="tabCreds" aria-selected="false" class="tab">App credentials</button>
     <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <span class="sync-chip off" id="tmChip">Not connected</span>
@@ -143,6 +144,68 @@
     </section>
     <div class="projects-grid" id="tmProjList"></div>
     <p class="empty" id="tmProjEmpty">No projects yet.</p>
+  </main>
+
+  <!-- ===================== App credentials (encrypted vault) ===================== -->
+  <main class="layout creds-layout" id="tabCreds" role="tabpanel" hidden>
+    <div class="col">
+      <section class="card" aria-label="Vault">
+        <div class="card-head">
+          <h2>App credentials</h2>
+          <span class="count-pill vault-chip shut" id="tmVaultState">Locked</span>
+        </div>
+        <p class="hint" id="tmVaultHint"></p>
+        <form id="tmVaultForm" class="video-form" autocomplete="off">
+          <label>Vault password
+            <input type="password" id="tmVaultPass" autocomplete="off" spellcheck="false" required>
+          </label>
+          <label id="tmVaultPass2Wrap" hidden>Repeat the password
+            <input type="password" id="tmVaultPass2" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn" id="tmVaultBtn">Unlock</button>
+            <span class="form-msg" id="tmVaultMsg" role="status"></span>
+          </div>
+        </form>
+        <div class="form-row" id="tmVaultLockRow" hidden>
+          <button type="button" class="ghost-btn" id="tmVaultLock">Lock now</button>
+        </div>
+      </section>
+
+      <section class="card" id="tmCredAddCard" aria-label="Add a credential" hidden>
+        <h2>Add a credential</h2>
+        <form id="tmCredForm" class="video-form" autocomplete="off">
+          <label>Project
+            <select id="tmCredProject"></select>
+          </label>
+          <label>What is it
+            <input type="text" id="tmCredTitle" maxlength="80" placeholder="e.g. Play Console, Firebase, Keystore" required>
+          </label>
+          <label>Username / email (optional)
+            <input type="text" id="tmCredLogin" maxlength="200" autocomplete="off" spellcheck="false">
+          </label>
+          <label>Password / key
+            <input type="password" id="tmCredSecret" maxlength="4000" autocomplete="new-password" spellcheck="false" required>
+          </label>
+          <label>Notes (optional)
+            <textarea id="tmCredNote" rows="2" maxlength="1000" placeholder="Where it is used, expiry date…"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Save encrypted</button>
+            <span class="form-msg" id="tmCredMsg" role="status"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <section class="card" aria-label="Saved credentials">
+      <div class="card-head">
+        <h2>Saved</h2>
+        <span class="count-pill"><strong id="tmCredCount">0</strong> saved</span>
+      </div>
+      <div id="tmCredList"></div>
+      <p class="empty" id="tmCredEmpty">No credentials saved yet.</p>
+    </section>
   </main>
 
   <!-- ===================== Ideas ===================== -->
