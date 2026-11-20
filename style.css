@@ -367,6 +367,7 @@ h3 {
 /* ---------- Ideas board: both people side by side ---------- */
 .ideas-wrap { max-width: 1140px; margin: 0 auto; padding: 14px 16px 40px; }
 .ideas-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ideas-board:has(> .idea-col[hidden]) { grid-template-columns: minmax(0, 1fr); }
 .idea-col h2 { padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
 .idea-col + .idea-col h2 { border-bottom-color: var(--accent-2); }
 .idea-form { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 4px; }

@@ -8,6 +8,8 @@
   var user = window.STANE_USER;
   var ROLE = user ? user.role : (document.body.dataset.role === 'member' ? 'member' : 'admin');
   var OTHER = ROLE === 'admin' ? 'member' : 'admin';
+  // Divyanshu's view leaves out Mohit's own ideas, his own team tasks and the expenses he added.
+  function hiddenFromMe(by) { return ROLE === 'admin' && by === 'member'; }
   var LOCAL_KEY = 'stane-team-v1';
   var TOKEN_KEY = 'stane-team-sync';
   var PERSONAL_SYNC_KEY = 'stane-selffix-sync';
@@ -364,6 +366,9 @@
     });
     ['admin', 'member'].forEach(function (who) {
       if (!el.ideas[who]) return;
+      var ownCol = el.ideas[who].closest('.idea-col');
+      if (ownCol) ownCol.hidden = hiddenFromMe(who);
+      if (hiddenFromMe(who)) return;
       el.ideaHead[who].textContent = nameOf(who) + (who === ROLE ? ' (you)' : '');
       var ids = Object.keys(state.ideas).filter(function (id) {
         var idea = state.ideas[id];
@@ -835,7 +840,7 @@
 
     var p = expView.split('-');
     el.expMonthTitle.textContent = LONG_MONTHS[Number(p[1]) - 1] + ' ' + p[0];
-    var monthIds = ids.filter(function (id) { return (state.expenses[id].date || '').slice(0, 7) === expView; })
+    var monthIds = ids.filter(function (id) { return (state.expenses[id].date || '').slice(0, 7) === expView && !hiddenFromMe(state.expenses[id].by); })
       .sort(function (a, b) {
         var x = state.expenses[a], y = state.expenses[b];
         return x.date < y.date ? 1 : x.date > y.date ? -1 : y.created - x.created;
@@ -909,7 +914,11 @@
       el.boardOwner.options[2].textContent = nameOf('member') + (ROLE === 'member' ? ' (you)' : '');
     }
     var groups = { todo: [], doing: [], done: [] };
-    Object.keys(state.shared).forEach(function (id) { groups[statusOf(id)].push(id); });
+    Object.keys(state.shared).forEach(function (id) {
+      var t = state.shared[id];
+      if (hiddenFromMe(t.by) && t.owner === 'member') return;
+      groups[statusOf(id)].push(id);
+    });
     STATUSES.forEach(function (pair) {
       var key = pair[0], ids = groups[key], list = el.board[key];
       ids.sort(function (a, b) {
