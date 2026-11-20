@@ -210,6 +210,11 @@
 
   <!-- ===================== Ideas ===================== -->
   <main class="ideas-wrap" id="tabIdeas" role="tabpanel" hidden>
+    <div class="idea-filter" role="group" aria-label="Show ideas">
+      <button type="button" data-cat="all" class="active" aria-pressed="true">All</button>
+      <button type="button" data-cat="startup" aria-pressed="false">Startup ideas</button>
+      <button type="button" data-cat="app" aria-pressed="false">App ideas</button>
+    </div>
     <div class="ideas-board">
       <section class="card idea-col" aria-labelledby="tmIdeaHeadAdmin">
         <h2 id="tmIdeaHeadAdmin">Admin</h2>
@@ -220,6 +225,17 @@
         <h2 id="tmIdeaHeadMember">Partner</h2>
         <form class="idea-form" id="tmIdeaFormMember" autocomplete="off">
           <textarea id="tmIdeaInputMember" rows="2" maxlength="1000" placeholder="Write an idea…" aria-label="New idea"></textarea>
+          <div class="idea-opts">
+            <label>Which idea
+              <select id="tmIdeaCatMember">
+                <option value="startup">Startup idea</option>
+                <option value="app">App idea</option>
+              </select>
+            </label>
+            <label>Reminder (optional)
+              <input type="datetime-local" id="tmIdeaRemindMember">
+            </label>
+          </div>
           <button type="submit" class="primary-btn">Add idea</button>
         </form>
         <ul class="ideas" id="tmIdeasMember"></ul>

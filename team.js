@@ -33,6 +33,8 @@
     ideaEmpty: { admin: $('tmIdeaEmptyAdmin'), member: $('tmIdeaEmptyMember') },
     ideaForm: { admin: $('tmIdeaFormAdmin'), member: $('tmIdeaFormMember') },
     ideaInput: { admin: $('tmIdeaInputAdmin'), member: $('tmIdeaInputMember') },
+    ideaCat: { admin: $('tmIdeaCatAdmin'), member: $('tmIdeaCatMember') },
+    ideaRemind: { admin: $('tmIdeaRemindAdmin'), member: $('tmIdeaRemindMember') },
     expForm: $('tmExpForm'), expAmount: $('tmExpAmount'), expWhat: $('tmExpWhat'), expDate: $('tmExpDate'),
     expPaidBy: $('tmExpPaidBy'), expSplit: $('tmExpSplit'), expMsg: $('tmExpMsg'),
     expBalance: $('tmExpBalance'), expBalanceSub: $('tmExpBalanceSub'), expMonth: $('tmExpMonth'),
@@ -340,42 +342,215 @@
   }
 
   /* ---------------- render: ideas ---------------- */
+  var IDEA_CATS = { startup: 'Startup idea', app: 'App idea' };
+  var ideaFilter = 'all';
+  var editingRemind = {};
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  // Reminders are kept as local "YYYY-MM-DDTHH:MM" strings (what <input type="datetime-local"> gives).
+  function localStamp(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function remindLabel(r) { return shortKey(r.slice(0, 10)) + ', ' + formatTime(r.slice(11, 16)); }
+  function isDue(idea) { return !!(idea.remind && !idea.reminded && idea.remind <= localStamp(new Date())); }
+
   function renderIdeas() {
+    var filterBtns = document.querySelectorAll('.idea-filter button[data-cat]');
+    filterBtns.forEach(function (b) {
+      var on = b.dataset.cat === ideaFilter;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
     ['admin', 'member'].forEach(function (who) {
       if (!el.ideas[who]) return;
       el.ideaHead[who].textContent = nameOf(who) + (who === ROLE ? ' (you)' : '');
-      var ids = Object.keys(state.ideas).filter(function (id) { return state.ideas[id].by === who; })
-        .sort(function (a, b) { return state.ideas[b].created - state.ideas[a].created; });
+      var ids = Object.keys(state.ideas).filter(function (id) {
+        var idea = state.ideas[id];
+        return idea.by === who && (ideaFilter === 'all' || idea.cat === ideaFilter);
+      }).sort(function (a, b) { return state.ideas[b].created - state.ideas[a].created; });
       var list = el.ideas[who];
       list.textContent = '';
       ids.forEach(function (id) {
         var idea = state.ideas[id];
         var li = document.createElement('li');
         li.dataset.id = id;
+        if (isDue(idea) && idea.by === ROLE) li.className = 'due';
+        if (IDEA_CATS[idea.cat]) {
+          var cat = document.createElement('span');
+          cat.className = 'idea-cat ' + idea.cat;
+          cat.textContent = IDEA_CATS[idea.cat];
+          li.appendChild(cat);
+        }
         var text = document.createElement('p');
         text.className = 'idea-text';
         text.textContent = idea.text;
+        li.appendChild(text);
+
         var foot = document.createElement('div');
         foot.className = 'idea-foot';
         var when = document.createElement('span');
         when.textContent = shortStamp(idea.created);
         foot.appendChild(when);
+        var tools = document.createElement('span');
+        tools.className = 'idea-tools';
+        if (idea.remind) {
+          var chip = document.createElement('span');
+          chip.className = 'time-chip remind-chip' + (isDue(idea) ? ' overdue' : idea.reminded ? ' past' : '');
+          chip.textContent = '⏰ ' + remindLabel(idea.remind);
+          tools.appendChild(chip);
+        }
+        if (who === ROLE) {
+          var rb = document.createElement('button');
+          rb.type = 'button';
+          rb.className = 'mini-btn remind-edit';
+          rb.textContent = idea.remind ? 'Change reminder' : 'Set reminder';
+          tools.appendChild(rb);
+        }
         if (who === ROLE || ROLE === 'admin') {
           var del = document.createElement('button');
           del.type = 'button';
           del.className = 'del';
           del.textContent = '✕';
           del.setAttribute('aria-label', 'Delete idea');
-          foot.appendChild(del);
+          tools.appendChild(del);
         }
-        li.appendChild(text);
+        foot.appendChild(tools);
         li.appendChild(foot);
+
+        if (who === ROLE && editingRemind[id]) {
+          var form = document.createElement('form');
+          form.className = 'remind-form';
+          var input = document.createElement('input');
+          input.type = 'datetime-local';
+          input.required = true;
+          input.setAttribute('aria-label', 'Reminder date and time');
+          input.value = idea.remind || '';
+          form.appendChild(input);
+          var saveBtn = document.createElement('button');
+          saveBtn.type = 'submit';
+          saveBtn.className = 'mini-btn';
+          saveBtn.textContent = 'Save';
+          form.appendChild(saveBtn);
+          if (idea.remind) {
+            var clear = document.createElement('button');
+            clear.type = 'button';
+            clear.className = 'mini-btn remind-clear';
+            clear.textContent = 'Remove';
+            form.appendChild(clear);
+          }
+          li.appendChild(form);
+        }
         list.appendChild(li);
       });
       el.ideaEmpty[who].hidden = ids.length > 0;
       if (el.ideaForm[who]) el.ideaForm[who].hidden = who !== ROLE;
+      var col = el.ideas[who].closest('.idea-col');
+      if (col) col.classList.toggle('mine', who === ROLE);
     });
+    renderReminders();
   }
+
+  /* ---------------- reminders: popup + browser notification ---------------- */
+  var notified = {};   // reminders already sent as a browser notification in this visit
+  var pop = null;
+  function ideasTabButton() { return document.querySelector('[aria-controls="tabIdeas"]'); }
+  function dueIds() {
+    return Object.keys(state.ideas).filter(function (id) {
+      var idea = state.ideas[id];
+      return idea.by === ROLE && isDue(idea);
+    }).sort(function (a, b) { return state.ideas[a].remind < state.ideas[b].remind ? -1 : 1; });
+  }
+  function askNotifyPermission() {
+    try {
+      if (window.Notification && Notification.permission === 'default') Notification.requestPermission();
+    } catch (e) { /* not supported */ }
+  }
+  function renderReminders() {
+    var ids = dueIds();
+    var tab = ideasTabButton();
+    if (tab) {
+      var badge = tab.querySelector('.tab-badge');
+      if (ids.length) {
+        if (!badge) { badge = document.createElement('span'); badge.className = 'tab-badge'; tab.appendChild(badge); }
+        badge.textContent = ids.length;
+      } else if (badge) badge.remove();
+    }
+    if (!ids.length) { if (pop) pop.hidden = true; return; }
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.className = 'remind-pop';
+      pop.setAttribute('role', 'alertdialog');
+      pop.setAttribute('aria-label', 'Idea reminders');
+      document.body.appendChild(pop);
+      pop.addEventListener('click', onPopClick);
+    }
+    pop.textContent = '';
+    var h = document.createElement('h2');
+    h.textContent = ids.length === 1 ? 'Reminder' : ids.length + ' reminders';
+    pop.appendChild(h);
+    var ul = document.createElement('ul');
+    ids.forEach(function (id) {
+      var idea = state.ideas[id];
+      var li = document.createElement('li');
+      li.dataset.id = id;
+      if (IDEA_CATS[idea.cat]) {
+        var cat = document.createElement('span');
+        cat.className = 'idea-cat ' + idea.cat;
+        cat.textContent = IDEA_CATS[idea.cat];
+        li.appendChild(cat);
+      }
+      var t = document.createElement('p');
+      t.className = 'idea-text';
+      t.textContent = idea.text;
+      li.appendChild(t);
+      var row = document.createElement('div');
+      row.className = 'form-row';
+      var done = document.createElement('button');
+      done.type = 'button';
+      done.className = 'primary-btn pop-done';
+      done.textContent = 'Done';
+      var snooze = document.createElement('button');
+      snooze.type = 'button';
+      snooze.className = 'ghost-btn pop-snooze';
+      snooze.textContent = 'Remind in 1 hour';
+      row.appendChild(done);
+      row.appendChild(snooze);
+      li.appendChild(row);
+      ul.appendChild(li);
+
+      if (!notified[id]) {
+        notified[id] = true;
+        try {
+          if (window.Notification && Notification.permission === 'granted') {
+            new Notification((IDEA_CATS[idea.cat] || 'Idea') + ' reminder', { body: idea.text.slice(0, 180), tag: 'idea-' + id });
+          }
+        } catch (e) { /* some phones only allow notifications from an installed app */ }
+      }
+    });
+    pop.appendChild(ul);
+    pop.hidden = false;
+  }
+  function updateIdea(id, changes) {
+    var idea = state.ideas[id];
+    if (!idea) return;
+    var next = {};
+    Object.keys(idea).forEach(function (k) { next[k] = idea[k]; });
+    Object.keys(changes).forEach(function (k) { next[k] = changes[k]; });
+    state.ideas[id] = next;
+    stamp('i:' + id);
+    save();
+    render();
+  }
+  function onPopClick(e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    var id = li.dataset.id;
+    if (e.target.closest('.pop-done')) updateIdea(id, { reminded: true });
+    else if (e.target.closest('.pop-snooze')) {
+      delete notified[id];
+      updateIdea(id, { remind: localStamp(new Date(Date.now() + 60 * 60 * 1000)), reminded: false });
+    }
+  }
+  setInterval(renderReminders, 30000);
 
   /* ---------------- render: expenses ---------------- */
   // How much of an expense the payer covered for the other person.
@@ -1133,9 +1308,14 @@
         var text = el.ideaInput[who].value.trim();
         if (!text) return;
         var id = newId();
-        state.ideas[id] = { by: ROLE, text: text, created: Date.now() };
+        var catSel = el.ideaCat[who], remIn = el.ideaRemind[who];
+        var idea = { by: ROLE, text: text, created: Date.now() };
+        if (catSel && IDEA_CATS[catSel.value]) idea.cat = catSel.value;
+        if (remIn && remIn.value) { idea.remind = remIn.value; askNotifyPermission(); }
+        state.ideas[id] = idea;
         stamp('i:' + id);
         el.ideaInput[who].value = '';
+        if (remIn) remIn.value = '';
         save();
         render();
         el.ideaInput[who].focus();
@@ -1145,7 +1325,32 @@
       });
     }
     if (el.ideas[who]) {
+      el.ideas[who].addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form.classList.contains('remind-form')) return;
+        e.preventDefault();
+        var rid = form.closest('li').dataset.id;
+        var value = form.querySelector('input').value;
+        if (!value || !state.ideas[rid] || state.ideas[rid].by !== ROLE) return;
+        delete editingRemind[rid];
+        delete notified[rid];
+        askNotifyPermission();
+        updateIdea(rid, { remind: value, reminded: false });
+      });
       el.ideas[who].addEventListener('click', function (e) {
+        var rli = e.target.closest('li');
+        if (rli && e.target.closest('.remind-edit')) {
+          editingRemind[rli.dataset.id] = !editingRemind[rli.dataset.id];
+          render();
+          var inp = el.ideas[who].querySelector('li[data-id="' + rli.dataset.id + '"] .remind-form input');
+          if (inp) inp.focus();
+          return;
+        }
+        if (rli && e.target.closest('.remind-clear')) {
+          delete editingRemind[rli.dataset.id];
+          updateIdea(rli.dataset.id, { remind: '', reminded: false });
+          return;
+        }
         var del = e.target.closest('.del');
         if (!del) return;
         var id = del.closest('li').dataset.id;
@@ -1159,6 +1364,10 @@
         });
       });
     }
+  });
+
+  document.querySelectorAll('.idea-filter button[data-cat]').forEach(function (b) {
+    b.addEventListener('click', function () { ideaFilter = b.dataset.cat; renderIdeas(); });
   });
 
   /* ---------------- events: expenses ---------------- */
@@ -1744,4 +1953,48 @@
   if (el.assignDue) el.assignDue.min = todayKey();
   render();
   syncNow();
+})();
+
+/* ---------------- phone menu: ☰ button + slide-in section list ---------------- */
+(function () {
+  'use strict';
+  var nav = document.querySelector('nav.tabs');
+  if (!nav) return;
+  var bar = document.createElement('div');
+  bar.className = 'mobile-bar';
+  var menu = document.createElement('button');
+  menu.type = 'button';
+  menu.className = 'menu-btn';
+  menu.setAttribute('aria-label', 'Open menu');
+  menu.setAttribute('aria-expanded', 'false');
+  menu.textContent = '☰';
+  var title = document.createElement('span');
+  title.className = 'mobile-title';
+  bar.appendChild(menu);
+  bar.appendChild(title);
+  var shade = document.createElement('div');
+  shade.className = 'nav-shade';
+  document.body.insertBefore(bar, document.body.firstChild);
+  nav.parentNode.insertBefore(shade, nav);
+
+  function setOpen(open) {
+    document.documentElement.classList.toggle('nav-open', open);
+    menu.setAttribute('aria-expanded', String(open));
+  }
+  function updateTitle() {
+    var active = nav.querySelector('.tab.active');
+    if (!active) return;
+    var copy = active.cloneNode(true);
+    var badge = copy.querySelector('.tab-badge');
+    if (badge) badge.remove();
+    title.textContent = copy.textContent.trim();
+  }
+  menu.addEventListener('click', function () { setOpen(!document.documentElement.classList.contains('nav-open')); });
+  shade.addEventListener('click', function () { setOpen(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+  nav.addEventListener('click', function (e) {
+    if (!e.target.closest('.tab')) return;
+    setTimeout(function () { updateTitle(); setOpen(false); window.scrollTo(0, 0); }, 0);
+  });
+  updateTitle();
 })();
