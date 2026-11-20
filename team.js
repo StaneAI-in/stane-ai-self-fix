@@ -108,16 +108,16 @@
   // Starting list of projects. Seeded with a tiny stamp, so any real change (an edit
   // or a delete) made on any device always wins over the seed. Raise SEED_STAMP when
   // the seed text changes, so untouched seeds pick up the new text.
-  var SEED_STAMP = 4;       // projects
+  var SEED_STAMP = 5;       // projects
   var IMPL_SEED_STAMP = 3;  // implementation ideas
-  var GH = 'https://github.com/divyanshu7588/';
+  var GH = 'https://github.com/StaneAI-in/';
   // id -> [type tag, repo link, live link]
   var DEFAULT_LINKS = {
     'seed-stane-ai': ['Desktop app', GH + 'staneai-model-arena', ''],
     'seed-staneai': ['Website', GH + 'StaneAi-website', 'https://staneai.in'],
     'seed-report-generator': ['Web app', '', ''],
     'seed-lead-hunter': ['Web app', GH + 'StaneAi-Lead_hunter', ''],
-    'seed-self-fix': ['Web app', 'https://github.com/StaneAI-in/stane-ai-self-fix', 'https://staneai-in.github.io/stane-ai-self-fix/']
+    'seed-self-fix': ['Web app', GH + 'stane-ai-self-fix', 'https://staneai-in.github.io/stane-ai-self-fix/']
   };
   var DEFAULT_PROJECTS = [
     ['seed-stane-ai', 'Stane-AI',

@@ -15,11 +15,17 @@
   var KEYS = window.STANE_TEAM_KEYS || {};
   // Admin only: the personal calendar/English sync token, so a new phone fills up on sign-in.
   var PERSONAL_KEYS = window.STANE_PERSONAL_KEYS || {};
+  // Raised whenever the tokens in team-key.js are replaced, so devices that still hold an
+  // older token ask for one more sign-in and pick up the new one.
+  var KEYS_VERSION = window.STANE_KEYS_VERSION || 1;
   var root = document.documentElement;
   var page = root.dataset.page === 'member' ? 'member' : 'admin';
 
   function storedToken(key) {
-    try { return (JSON.parse(localStorage.getItem(key) || '{}') || {}).token || ''; } catch (e) { return ''; }
+    try {
+      var saved = JSON.parse(localStorage.getItem(key) || '{}') || {};
+      return (saved.v || 1) === KEYS_VERSION ? saved.token || '' : '';
+    } catch (e) { return ''; }
   }
 
   function readLogin() {
@@ -102,13 +108,13 @@
       if (KEYS[h]) {
         try {
           var token = await unlockToken(secret, KEYS[h]);
-          localStorage.setItem(TEAM_TOKEN_KEY, JSON.stringify({ token: token }));
+          localStorage.setItem(TEAM_TOKEN_KEY, JSON.stringify({ token: token, v: KEYS_VERSION }));
         } catch (err) { /* sync stays off; the Team screen says so */ }
       }
       if (PERSONAL_KEYS[h]) {
         try {
           var personal = await unlockToken(secret, PERSONAL_KEYS[h]);
-          localStorage.setItem(PERSONAL_TOKEN_KEY, JSON.stringify({ token: personal }));
+          localStorage.setItem(PERSONAL_TOKEN_KEY, JSON.stringify({ token: personal, v: KEYS_VERSION }));
         } catch (err) { /* personal sync stays off; the Sync tab says so */ }
       }
       try { localStorage.setItem(LOGIN_KEY, JSON.stringify({ h: h, email: email })); }
