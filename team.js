@@ -1021,7 +1021,7 @@
           meta.className = 'team-meta';
           meta.textContent = it.statusBy
             ? nameOf(it.statusBy) + ' marked ' + statusLabel(key) + ' · ' + shortStamp(it.statusAt)
-            : 'Added by ' + nameOf(it.by) + ' · ' + shortStamp(it.created);
+            : it.created < 1e10 ? 'Starter idea' : 'Added by ' + nameOf(it.by) + ' · ' + shortStamp(it.created);
           li.appendChild(meta);
           var row = document.createElement('div');
           row.className = 'board-actions';

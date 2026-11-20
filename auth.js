@@ -76,8 +76,8 @@
     gate.id = 'loginGate';
     gate.innerHTML =
       '<form class="card login-card" autocomplete="on">' +
-      '<img src="logo.svg" alt="" width="52" height="52">' +
-      '<h1>Stane AI</h1>' +
+      '<img class="login-logo" src="logo-full.png" alt="StaneAI" width="720" height="234">' +
+      '<h1>Team sign in</h1>' +
       '<p class="hint"></p>' +
       '<label>Email<input type="email" name="email" autocomplete="username" required></label>' +
       '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' +

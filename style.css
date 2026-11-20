@@ -1,40 +1,42 @@
 :root {
-  --bg: #f3f4f8;
+  --bg: #f2f6fc;
   --panel: #ffffff;
-  --text: #1b1e28;
-  --muted: #6b7280;
-  --line: #e3e6ee;
-  --accent: #6366f1;
-  --accent-2: #8b5cf6;
-  --accent-soft: #eef0ff;
+  --text: #0b1220;
+  --muted: #5b6678;
+  --line: #dfe6f1;
+  --accent: #0a74e6;
+  --accent-2: #2f9bff;
+  --accent-soft: #e6f1ff;
   --accent-text: #ffffff;
   --cross: #dc2626;
   --done: #16a34a;
   --streak: #ea580c;
   --streak-soft: #fff1e6;
-  --cell: #f9fafc;
-  --cell-hover: #eef0ff;
-  --shadow: 0 1px 2px rgba(20, 24, 40, 0.05), 0 8px 24px rgba(20, 24, 40, 0.06);
+  --cell: #f7faff;
+  --cell-hover: #e6f1ff;
+  --glow: rgba(0, 128, 248, 0.25);
+  --shadow: 0 1px 2px rgba(10, 30, 60, 0.05), 0 8px 24px rgba(10, 30, 60, 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1016;
-    --panel: #171a23;
-    --text: #e9ebf2;
-    --muted: #9aa2b4;
-    --line: #292e3b;
-    --accent: #818cf8;
-    --accent-2: #a78bfa;
-    --accent-soft: #23264a;
-    --accent-text: #0e1016;
+    --bg: #030508;
+    --panel: #0b0f16;
+    --text: #eaf2ff;
+    --muted: #8b97ab;
+    --line: #1b2433;
+    --accent: #1f8bff;
+    --accent-2: #5cb2ff;
+    --accent-soft: #0b2240;
+    --accent-text: #ffffff;
     --cross: #f87171;
     --done: #4ade80;
     --streak: #fb923c;
     --streak-soft: #3a2616;
-    --cell: #1c202b;
-    --cell-hover: #262b45;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    --cell: #0f1520;
+    --cell-hover: #13284a;
+    --glow: rgba(0, 128, 248, 0.45);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -841,3 +843,10 @@ a.link-main:hover strong { color: var(--accent); }
   html.nav-collapsed .tabs .sync-chip,
   html.nav-collapsed .tabs .user-bar { display: none; }
 }
+
+/* ---------- Brand: StaneAI logo ---------- */
+.brand img { border-radius: 12px; box-shadow: 0 0 18px var(--glow); }
+.brand h1 { background: linear-gradient(90deg, var(--text) 0%, var(--text) 55%, var(--accent) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tab.active { box-shadow: 0 0 14px var(--glow); }
+.login-card .login-logo { width: 100%; max-width: 280px; height: auto; border-radius: 12px; align-self: center; }
+.card { transition: border-color 0.15s ease; }
