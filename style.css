@@ -850,3 +850,41 @@ a.link-main:hover strong { color: var(--accent); }
 .tab.active { box-shadow: 0 0 14px var(--glow); }
 .login-card .login-logo { width: 100%; max-width: 280px; height: auto; border-radius: 12px; align-self: center; }
 .card { transition: border-color 0.15s ease; }
+
+/* ---------- Idea plan ---------- */
+.idea-open-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.idea-open { padding: 6px 12px; font-size: 0.85rem; }
+.plan-chip { font-size: 0.78rem; font-weight: 600; color: var(--done); }
+html.modal-open { overflow: hidden; }
+.plan-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+.plan-card { width: min(680px, 100%); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), 0 0 24px var(--glow); }
+.plan-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-title { margin: 6px 0 2px; font-size: 1.3rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.plan-steps li.done .text { text-decoration: line-through; color: var(--muted); }
+.plan-num { color: var(--muted); font-weight: 600; min-width: 1.6em; }
+.plan-steps .text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.plan-note-form { display: flex; flex-direction: column; gap: 8px; }
+.plan-note-form textarea {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.plan-note-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+@media (max-width: 640px) {
+  .plan-shade { padding: 0; }
+  .plan-card { min-height: 100%; border-radius: 0; }
+}

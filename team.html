@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=21">
-  <script src="team-key.js?v=21"></script>
-  <script src="auth.js?v=21"></script>
+  <link rel="stylesheet" href="style.css?v=22">
+  <script src="team-key.js?v=22"></script>
+  <script src="auth.js?v=22"></script>
 </head>
 <body data-role="member">
   <header class="top">
@@ -269,8 +269,7 @@
   <!-- ===================== Ideas ===================== -->
   <main class="ideas-wrap" id="tabIdeas" role="tabpanel" hidden>
     <div class="idea-filter" role="group" aria-label="Show ideas">
-      <button type="button" data-cat="all" class="active" aria-pressed="true">All</button>
-      <button type="button" data-cat="startup" aria-pressed="false">Startup ideas</button>
+      <button type="button" data-cat="startup" class="active" aria-pressed="true">Startup ideas</button>
       <button type="button" data-cat="app" aria-pressed="false">App ideas</button>
     </div>
     <div class="ideas-board">
@@ -379,6 +378,6 @@
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
     })();
   </script>
-  <script src="team.js?v=21"></script>
+  <script src="team.js?v=22"></script>
 </body>
 </html>

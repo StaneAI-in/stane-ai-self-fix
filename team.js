@@ -90,7 +90,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -201,7 +201,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -221,6 +221,8 @@
     Object.keys(s.done).forEach(function (id) { if (!s.tasks[id]) delete s.done[id]; });
     Object.keys(s.sharedStatus).forEach(function (id) { if (!s.shared[id]) delete s.sharedStatus[id]; });
     Object.keys(s.impl).forEach(function (id) { if (!s.projects[s.impl[id].project]) delete s.impl[id]; });
+    Object.keys(s.planSteps).forEach(function (id) { if (!s.ideas[s.planSteps[id].idea]) delete s.planSteps[id]; });
+    Object.keys(s.planNotes).forEach(function (id) { if (!s.ideas[id]) delete s.planNotes[id]; });
     Object.keys(s.remarks).forEach(function (id) {
       var on = s.remarks[id].on;
       if (!s.tasks[on] && !s.shared[on]) delete s.remarks[id];
@@ -343,7 +345,7 @@
 
   /* ---------------- render: ideas ---------------- */
   var IDEA_CATS = { startup: 'Startup idea', app: 'App idea' };
-  var ideaFilter = 'all';
+  var ideaFilter = 'startup';
   var editingRemind = {};
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
   // Reminders are kept as local "YYYY-MM-DDTHH:MM" strings (what <input type="datetime-local"> gives).
@@ -365,7 +367,7 @@
       el.ideaHead[who].textContent = nameOf(who) + (who === ROLE ? ' (you)' : '');
       var ids = Object.keys(state.ideas).filter(function (id) {
         var idea = state.ideas[id];
-        return idea.by === who && (ideaFilter === 'all' || idea.cat === ideaFilter);
+        return idea.by === who && catOf(idea) === ideaFilter;
       }).sort(function (a, b) { return state.ideas[b].created - state.ideas[a].created; });
       var list = el.ideas[who];
       list.textContent = '';
@@ -374,16 +376,30 @@
         var li = document.createElement('li');
         li.dataset.id = id;
         if (isDue(idea) && idea.by === ROLE) li.className = 'due';
-        if (IDEA_CATS[idea.cat]) {
-          var cat = document.createElement('span');
-          cat.className = 'idea-cat ' + idea.cat;
-          cat.textContent = IDEA_CATS[idea.cat];
-          li.appendChild(cat);
-        }
+        var cat = document.createElement('span');
+        cat.className = 'idea-cat ' + catOf(idea);
+        cat.textContent = IDEA_CATS[catOf(idea)];
+        li.appendChild(cat);
         var text = document.createElement('p');
         text.className = 'idea-text';
         text.textContent = idea.text;
         li.appendChild(text);
+
+        var pc = planCounts(id);
+        var openRow = document.createElement('div');
+        openRow.className = 'idea-open-row';
+        var ob = document.createElement('button');
+        ob.type = 'button';
+        ob.className = 'primary-btn idea-open';
+        ob.textContent = pc.total ? 'Open plan' : 'Open & plan';
+        openRow.appendChild(ob);
+        if (pc.total) {
+          var pchip = document.createElement('span');
+          pchip.className = 'plan-chip';
+          pchip.textContent = pc.done + '/' + pc.total + ' steps done';
+          openRow.appendChild(pchip);
+        }
+        li.appendChild(openRow);
 
         var foot = document.createElement('div');
         foot.className = 'idea-foot';
@@ -447,7 +463,223 @@
       if (col) col.classList.toggle('mine', who === ROLE);
     });
     renderReminders();
+    renderPlan();
   }
+
+  /* ---------------- idea plan: open an idea and plan how to build it ---------------- */
+  var openIdeaId = '';
+  var planBox = null;
+  function catOf(idea) { return idea.cat === 'app' ? 'app' : 'startup'; }   // ideas made before types existed count as startup ideas
+  function planStepIds(ideaId) {
+    return Object.keys(state.planSteps).filter(function (id) { return state.planSteps[id].idea === ideaId; })
+      .sort(function (a, b) { return state.planSteps[a].created - state.planSteps[b].created; });
+  }
+  function planCounts(ideaId) {
+    var ids = planStepIds(ideaId), done = 0;
+    ids.forEach(function (id) { if (state.planSteps[id].done) done++; });
+    return { total: ids.length, done: done };
+  }
+  function dropPlan(ideaId) {
+    planStepIds(ideaId).forEach(function (sid) { delete state.planSteps[sid]; stamp('ps:' + sid); });
+    if (state.planNotes[ideaId]) { delete state.planNotes[ideaId]; stamp('pn:' + ideaId); }
+  }
+  function closePlan() {
+    openIdeaId = '';
+    if (planBox) planBox.hidden = true;
+    document.documentElement.classList.remove('modal-open');
+  }
+  function openPlan(id) {
+    openIdeaId = id;
+    renderPlan();
+    var first = planBox && planBox.querySelector('[data-draft="ps:' + id + '"]');
+    if (first) first.focus();
+  }
+  function renderPlan() {
+    var idea = openIdeaId && state.ideas[openIdeaId];
+    if (!idea) { if (openIdeaId) closePlan(); return; }
+    var id = openIdeaId;
+    if (!planBox) {
+      planBox = document.createElement('div');
+      planBox.className = 'plan-shade';
+      planBox.addEventListener('click', onPlanClick);
+      planBox.addEventListener('change', onPlanChange);
+      planBox.addEventListener('submit', onPlanSubmit);
+      document.body.appendChild(planBox);
+    }
+    planBox.textContent = '';
+    planBox.hidden = false;
+    document.documentElement.classList.add('modal-open');
+
+    var card = document.createElement('section');
+    card.className = 'card plan-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-label', 'Plan for this idea');
+
+    var top = document.createElement('div');
+    top.className = 'plan-top';
+    var cat = document.createElement('span');
+    cat.className = 'idea-cat ' + catOf(idea);
+    cat.textContent = IDEA_CATS[catOf(idea)];
+    top.appendChild(cat);
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'del plan-close';
+    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Close');
+    top.appendChild(x);
+    card.appendChild(top);
+
+    var h = document.createElement('h2');
+    h.className = 'plan-title';
+    h.textContent = idea.text;
+    card.appendChild(h);
+    var meta = document.createElement('p');
+    meta.className = 'hint';
+    meta.textContent = 'Idea by ' + nameOf(idea.by) + ' · ' + shortStamp(idea.created);
+    card.appendChild(meta);
+
+    var c = planCounts(id);
+    var pct = c.total ? Math.round(c.done / c.total * 100) : 0;
+    var bar = document.createElement('div');
+    bar.className = 'progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(pct));
+    var fill = document.createElement('div');
+    fill.className = 'progress-bar';
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    card.appendChild(bar);
+    var pt = document.createElement('p');
+    pt.className = 'progress-text';
+    pt.textContent = c.total ? pct + '% · ' + c.done + ' of ' + c.total + ' steps done' : 'No steps yet. Break the idea into steps below.';
+    card.appendChild(pt);
+
+    var h3 = document.createElement('h3');
+    h3.textContent = 'Plan to build it';
+    card.appendChild(h3);
+    var ids = planStepIds(id);
+    if (ids.length) {
+      var ul = document.createElement('ul');
+      ul.className = 'tasks plan-steps';
+      ids.forEach(function (sid, i) {
+        var st = state.planSteps[sid];
+        var li = document.createElement('li');
+        li.className = st.done ? 'done' : '';
+        li.dataset.sid = sid;
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!st.done;
+        box.setAttribute('aria-label', 'Step done: ' + st.text);
+        li.appendChild(box);
+        var num = document.createElement('span');
+        num.className = 'plan-num';
+        num.textContent = (i + 1) + '.';
+        li.appendChild(num);
+        var t = document.createElement('span');
+        t.className = 'text';
+        t.textContent = st.text;
+        li.appendChild(t);
+        li.appendChild(delButton('plan-step-del', 'Delete step: ' + st.text));
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+    }
+    var add = document.createElement('form');
+    add.className = 'add plan-add';
+    add.autocomplete = 'off';
+    add.appendChild(draftInput('ps:' + id, 'Next step, e.g. Talk to 10 possible customers', 'New plan step', 200));
+    var ab = document.createElement('button');
+    ab.type = 'submit';
+    ab.textContent = 'Add step';
+    add.appendChild(ab);
+    card.appendChild(add);
+
+    var h3b = document.createElement('h3');
+    h3b.textContent = 'Plan notes';
+    card.appendChild(h3b);
+    var note = state.planNotes[id];
+    var nf = document.createElement('form');
+    nf.className = 'plan-note-form';
+    var ta = document.createElement('textarea');
+    ta.rows = 5;
+    ta.maxLength = 5000;
+    ta.placeholder = 'Target users, features, tech stack, budget, timeline, how it makes money…';
+    ta.setAttribute('aria-label', 'Plan notes');
+    ta.dataset.draft = 'pn:' + id;
+    ta.value = drafts['pn:' + id] !== undefined ? drafts['pn:' + id] : (note ? note.text : '');
+    nf.appendChild(ta);
+    var row = document.createElement('div');
+    row.className = 'form-row';
+    var sb = document.createElement('button');
+    sb.type = 'submit';
+    sb.className = 'primary-btn';
+    sb.textContent = 'Save notes';
+    row.appendChild(sb);
+    if (note && note.at) {
+      var saved = document.createElement('span');
+      saved.className = 'hint';
+      saved.textContent = 'Last saved by ' + nameOf(note.by) + ' · ' + shortStamp(note.at);
+      row.appendChild(saved);
+    }
+    nf.appendChild(row);
+    card.appendChild(nf);
+
+    planBox.appendChild(card);
+  }
+  function onPlanClick(e) {
+    if (e.target === planBox || e.target.closest('.plan-close')) { closePlan(); return; }
+    var del = e.target.closest('.plan-step-del');
+    if (!del) return;
+    var sid = del.closest('li').dataset.sid;
+    armOrRun(del, function () {
+      delete state.planSteps[sid];
+      stamp('ps:' + sid);
+      save();
+      render();
+    });
+  }
+  function onPlanChange(e) {
+    if (e.target.type !== 'checkbox') return;
+    var sid = e.target.closest('li').dataset.sid, st = state.planSteps[sid];
+    if (!st) return;
+    var next = {};
+    Object.keys(st).forEach(function (k) { next[k] = st[k]; });
+    next.done = e.target.checked ? Date.now() : 0;
+    next.doneBy = ROLE;
+    state.planSteps[sid] = next;
+    stamp('ps:' + sid);
+    save();
+    render();
+  }
+  function onPlanSubmit(e) {
+    e.preventDefault();
+    var id = openIdeaId;
+    if (!id || !state.ideas[id]) return;
+    if (e.target.classList.contains('plan-add')) {
+      var input = e.target.querySelector('input');
+      var text = input.value.trim();
+      if (!text) return;
+      var sid = newId();
+      state.planSteps[sid] = { idea: id, text: text, done: 0, by: ROLE, created: Date.now() };
+      stamp('ps:' + sid);
+      delete drafts['ps:' + id];
+      input.value = '';
+      save();
+      render();
+      var again = planBox.querySelector('[data-draft="ps:' + id + '"]');
+      if (again) again.focus();
+    } else if (e.target.classList.contains('plan-note-form')) {
+      state.planNotes[id] = { text: e.target.querySelector('textarea').value.trim(), by: ROLE, at: Date.now() };
+      stamp('pn:' + id);
+      delete drafts['pn:' + id];
+      save();
+      render();
+    }
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openIdeaId) closePlan(); });
 
   /* ---------------- reminders: popup + browser notification ---------------- */
   var notified = {};   // reminders already sent as a browser notification in this visit
@@ -1311,6 +1543,7 @@
         var catSel = el.ideaCat[who], remIn = el.ideaRemind[who];
         var idea = { by: ROLE, text: text, created: Date.now() };
         if (catSel && IDEA_CATS[catSel.value]) idea.cat = catSel.value;
+        ideaFilter = idea.cat || 'startup';
         if (remIn && remIn.value) { idea.remind = remIn.value; askNotifyPermission(); }
         state.ideas[id] = idea;
         stamp('i:' + id);
@@ -1339,6 +1572,7 @@
       });
       el.ideas[who].addEventListener('click', function (e) {
         var rli = e.target.closest('li');
+        if (rli && e.target.closest('.idea-open')) { openPlan(rli.dataset.id); return; }
         if (rli && e.target.closest('.remind-edit')) {
           editingRemind[rli.dataset.id] = !editingRemind[rli.dataset.id];
           render();
@@ -1359,6 +1593,7 @@
         armOrRun(del, function () {
           delete state.ideas[id];
           stamp('i:' + id);
+          dropPlan(id);
           save();
           render();
         });
@@ -1367,7 +1602,11 @@
   });
 
   document.querySelectorAll('.idea-filter button[data-cat]').forEach(function (b) {
-    b.addEventListener('click', function () { ideaFilter = b.dataset.cat; renderIdeas(); });
+    b.addEventListener('click', function () {
+      ideaFilter = b.dataset.cat;
+      ['admin', 'member'].forEach(function (w) { if (el.ideaCat[w]) el.ideaCat[w].value = ideaFilter; });
+      renderIdeas();
+    });
   });
 
   /* ---------------- events: expenses ---------------- */
