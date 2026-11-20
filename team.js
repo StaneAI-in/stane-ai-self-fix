@@ -124,6 +124,44 @@
       'This app: personal calendar, daily tasks, streaks and English practice, plus the shared team space ' +
       'for tasks, ideas, expenses and projects.']
   ];
+  // Starting implementation ideas for each seeded project (same stamp rule as above).
+  var DEFAULT_IMPL = {
+    'seed-stane-ai': [
+      'Connect Ollama so local models can answer (Step 2 in the README)',
+      'Add Google Gemini and OpenRouter as providers',
+      'Arena mode: send one prompt to 2-3 models side by side and pick the best answer',
+      'Save chat history locally (SQLite) with search',
+      'Export a chat to Markdown or PDF'
+    ],
+    'seed-staneai': [
+      'Replace the placeholder social links with the real profiles',
+      'Working contact form that sends enquiries to email',
+      'Portfolio / case studies page for finished apps',
+      'Publish regular blog posts for SEO',
+      'Run a Lighthouse audit and self-host the fonts for speed'
+    ],
+    'seed-report-generator': [
+      'Save past reports with a history page and search',
+      'Show which source each key finding came from',
+      'Add charts for sentiment and trends in the PDF',
+      'Schedule a weekly report on a saved topic',
+      'Share a report by link or email'
+    ],
+    'seed-lead-hunter': [
+      'Auto-draft a pitch for each qualified lead',
+      'Instant phone alert (Telegram) for high-score leads',
+      'Pipeline stages (new, pitched, replied, won) with win-rate stats',
+      'Detect the same lead posted on several sources',
+      'Weekly report of which sources bring the best leads'
+    ],
+    'seed-self-fix': [
+      'Browser / phone reminders for tasks that are due',
+      'Weekly summary of streaks, finished tasks and expenses',
+      'Progress bar on each project from its implementation statuses',
+      'Install on the phone as an app (PWA) with offline use',
+      'Monthly expense chart'
+    ]
+  };
   function seedProjects() {
     var changed = false;
     DEFAULT_PROJECTS.forEach(function (p, i) {
@@ -132,6 +170,16 @@
       state.projects[p[0]] = { name: p[1], note: p[2], by: 'admin', created: i + 1 };
       state.stamps[key] = SEED_STAMP;
       changed = true;
+    });
+    Object.keys(DEFAULT_IMPL).forEach(function (pid) {
+      if (!state.projects[pid]) return; // project was deleted
+      DEFAULT_IMPL[pid].forEach(function (text, i) {
+        var id = 'seed-im-' + pid.slice(5) + '-' + (i + 1), key = 'im:' + id;
+        if ((Number(state.stamps[key]) || 0) >= SEED_STAMP) return;
+        state.impl[id] = { project: pid, text: text, status: 'todo', by: 'admin', created: i + 1 };
+        state.stamps[key] = SEED_STAMP;
+        changed = true;
+      });
     });
     if (changed) saveLocal();
   }
