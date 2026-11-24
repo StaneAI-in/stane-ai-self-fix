@@ -1039,15 +1039,14 @@ html.modal-open { overflow: hidden; }
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--line);
   border-radius: 10px;
   background: var(--cell);
   cursor: pointer;
 }
 .task-pop-item label:hover { background: var(--cell-hover); }
-.task-pop-item.overdue label { border-left-color: var(--cross); }
-.task-pop-item.today label { border-left-color: var(--warn); }
-.task-pop-item.soon label { border-left-color: var(--accent); }
+.task-pop-item.overdue label { border-color: var(--cross); background: color-mix(in srgb, var(--cross) 7%, var(--cell)); }
+.task-pop-item.today label { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 7%, var(--cell)); }
+.task-pop-item.soon label { border-color: var(--accent); }
 .task-pop-item input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--accent); }
 .task-pop-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .task-pop-text { color: var(--text); overflow-wrap: anywhere; }
