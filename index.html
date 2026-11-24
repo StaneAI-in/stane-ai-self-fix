@@ -8,9 +8,12 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=32">
-  <script src="team-key.js?v=32"></script>
-  <script src="auth.js?v=32"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css?v=33">
+  <script src="team-key.js?v=33"></script>
+  <script src="auth.js?v=33"></script>
 </head>
 <body>
   <header class="top">
@@ -263,7 +266,7 @@
       <button type="button" data-view="list" class="active" aria-pressed="true">Projects</button>
       <button type="button" data-view="tasks" aria-pressed="false">Project tasks</button>
     </div>
-    <section class="card board-add" aria-label="Add a project">
+    <section class="card board-add" id="tmProjAddCard" aria-label="Projects">
       <div class="card-head">
         <h2>Projects</h2>
         <span class="count-pill"><strong id="tmProjCount">0</strong> projects</span>
@@ -767,7 +770,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=32"></script>
-  <script src="team.js?v=32"></script>
+  <script src="app.js?v=33"></script>
+  <script src="team.js?v=33"></script>
 </body>
 </html>

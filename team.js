@@ -1210,7 +1210,7 @@
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', String(on));
     });
-    if (el.projForm) el.projForm.closest('section').hidden = tasksView;
+    if ($('tmProjAddCard')) $('tmProjAddCard').hidden = tasksView;
     el.projList.classList.toggle('proj-tasks-view', tasksView);
     var ids = Object.keys(state.projects).sort(function (a, b) {
       return (state.projects[a].created || 0) - (state.projects[b].created || 0);
@@ -1845,7 +1845,7 @@
     var form = $(cfg.form);
     if (!form || form.dataset.popped) return;
     form.dataset.popped = '1';
-    var tab = $(cfg.tab);
+    var tab = form.closest('main');
     var section = form.closest('section');
     var moveWhole = cfg.whole && section;
     var box = makeShade('form-shade');
@@ -1866,7 +1866,13 @@
     card.setAttribute('aria-modal', 'true');
     card.insertBefore(closeButton(), card.firstChild);
     box.appendChild(card);
-    if (moveWhole && tab) tab.classList.add('one-col');
+    // When only one block is left on the page, centre it as a single column.
+    if (moveWhole && tab) {
+      var left = [].filter.call(tab.children, function (c) {
+        return c.matches('section, .col') && (c.matches('section') || c.querySelector('section'));
+      });
+      if (left.length === 1) tab.classList.add('one-col');
+    }
 
     var pop = { form: form, box: box, pending: false };
     formPops.push(pop);
@@ -1889,7 +1895,17 @@
     box.addEventListener('click', function (e) {
       if (e.target === box || e.target.closest('.pop-close')) close();
     });
-    card.addEventListener('submit', function () { pop.pending = true; }, true);
+    card.addEventListener('submit', function () {
+      pop.pending = true;
+      // Forms without a status line count as saved once their handler has emptied them.
+      setTimeout(function () {
+        var req = form.querySelector('[required]') || form.querySelector('textarea, input[type=text]');
+        if (pop.pending && req && !req.value && !card.querySelector('.form-msg.error:not(:empty)')) {
+          pop.pending = false;
+          close();
+        }
+      }, 150);
+    }, true);
     new MutationObserver(function () {
       if (!pop.pending) return;
       var ok = [].some.call(card.querySelectorAll('.form-msg'), function (m) {
@@ -1904,7 +1920,14 @@
     add.className = 'primary-btn add-open';
     add.textContent = '+ ' + cfg.label;
     add.addEventListener('click', pop.open);
-    if (host) host.appendChild(add);
+    if (!host) return;
+    if (cfg.place === 'before') {
+      var bar = document.createElement('div');
+      bar.className = 'page-actions';
+      bar.appendChild(add);
+      host.parentNode.insertBefore(bar, host);
+    } else if (cfg.place === 'after') host.parentNode.insertBefore(add, host.nextSibling);
+    else host.appendChild(add);
   }
   function openFormFor(form) {
     for (var i = 0; i < formPops.length; i++) if (formPops[i].form === form) { formPops[i].open(); return true; }
@@ -2346,6 +2369,17 @@
     popForm({ form: 'tmLinkForm', tab: 'tabLinks', title: 'Add a link', extra: ['tmLinkMsg'], host: headOf('tabLinks'), label: 'Add link' });
     popForm({ form: 'mmDocForm', tab: 'tabPartnerDocs', title: 'Add to Mohit Mummy Docs', host: headNear('mmDocForm'), label: 'Add' });
     popForm({ form: 'dmDocForm', tab: 'tabPartnerDocs', title: 'Add to Divyu Mummy Docs', host: headNear('dmDocForm'), label: 'Add' });
+    popForm({ form: 'tmAssignForm', tab: 'tabTasks', whole: true, label: 'Assign task',
+      host: function () { var l = $('tmMineList'); return l && l.closest('section').querySelector('.card-head'); } });
+    popForm({ form: 'tmBoardForm', tab: 'tabBoard', whole: true, label: 'Add team task',
+      host: function () { return document.querySelector('#tabBoard .board'); }, place: 'before' });
+    popForm({ form: 'tmProjForm', tab: 'tabProjects', title: 'Add a project', label: 'Add project',
+      host: function () { var c = $('tmProjAddCard'); return c && c.querySelector('.card-head'); } });
+    var ideaWho = ROLE === 'admin' ? 'Admin' : 'Member';
+    popForm({ form: 'tmIdeaForm' + ideaWho, tab: 'tabIdeas', title: 'Add an idea', label: 'Add idea',
+      host: function () { return $('tmIdeaHead' + ideaWho); }, place: 'after' });
+    popForm({ form: 'tmExpForm', tab: 'tabExpenses', whole: true, label: 'Add expense',
+      host: function () { return document.querySelector('#tabExpenses .balance-card'); } });
   }
 
   /* ---------------- "Your tasks" popup when the site opens ---------------- */
