@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=31">
-  <script src="team-key.js?v=31"></script>
-  <script src="auth.js?v=31"></script>
+  <link rel="stylesheet" href="style.css?v=32">
+  <script src="team-key.js?v=32"></script>
+  <script src="auth.js?v=32"></script>
 </head>
 <body>
   <header class="top">
@@ -476,7 +476,7 @@
         <button type="button" class="ghost-btn" id="akCopyEnv">Copy as .env</button>
       </div>
       <p class="form-msg" id="akToolMsg" role="status"></p>
-      <ul class="board-list ak-list" id="akList"></ul>
+      <ul class="row-list" id="akList"></ul>
       <p class="empty" id="akEmpty">No API keys saved yet.</p>
     </section>
   </main>
@@ -516,7 +516,7 @@
         <input type="search" id="pmSearch" placeholder="Search prompts…" aria-label="Search prompts">
         <select id="pmFilter" aria-label="Filter by category"></select>
       </div>
-      <ul class="board-list" id="pmList"></ul>
+      <ul class="row-list" id="pmList"></ul>
       <p class="empty" id="pmEmpty">No prompts saved yet.</p>
     </section>
   </main>
@@ -525,7 +525,7 @@
   <main class="layout split-layout" id="tabRepos" role="tabpanel" aria-labelledby="tabBtnRepos" hidden>
     <section class="card" aria-label="Add a repository">
       <h2 id="ghHead">Add a repository</h2>
-      <p class="hint">Important GitHub repos, shared by both of you.</p>
+      <p class="hint">Repos that make Claude more powerful, sorted by what they are used for.</p>
       <form id="ghForm" class="video-form" autocomplete="off">
         <label>Repository link
           <input type="text" id="ghUrl" maxlength="300" placeholder="https://github.com/owner/repo" required spellcheck="false">
@@ -537,8 +537,8 @@
           <textarea id="ghNote" rows="2" maxlength="1000" placeholder="What this repo is for…"></textarea>
         </label>
         <div class="idea-opts">
-          <label>Project (optional)
-            <input type="text" id="ghGroup" maxlength="60" placeholder="App or project" list="ghGroupList">
+          <label>Category
+            <input type="text" id="ghGroup" maxlength="60" placeholder="Web design, Security…" list="ghGroupList">
           </label>
           <label>Main branch (optional)
             <input type="text" id="ghBranch" maxlength="60" placeholder="main" spellcheck="false">
@@ -565,9 +565,9 @@
       </div>
       <div class="ak-tools">
         <input type="search" id="ghSearch" placeholder="Search repos…" aria-label="Search repositories">
-        <select id="ghFilter" aria-label="Filter by project"></select>
+        <select id="ghFilter" aria-label="Filter by category"></select>
       </div>
-      <ul class="board-list" id="ghList"></ul>
+      <ul class="row-groups" id="ghList"></ul>
       <p class="empty" id="ghEmpty">No repositories saved yet.</p>
     </section>
   </main>
@@ -577,54 +577,31 @@
     <section class="card" aria-label="Add an employee">
       <h2 id="emHead">Add an employee</h2>
       <form id="emForm" class="video-form" autocomplete="off">
-        <div class="idea-opts">
-          <label>Full name
-            <input type="text" id="emName" maxlength="100" required>
-          </label>
-          <label>Role
-            <input type="text" id="emRole" maxlength="80" placeholder="e.g. Flutter developer" required>
-          </label>
-        </div>
-        <div class="idea-opts">
-          <label>Phone (optional)
-            <input type="tel" id="emPhone" maxlength="30">
-          </label>
-          <label>Email (optional)
-            <input type="email" id="emEmail" maxlength="120">
-          </label>
-        </div>
-        <div class="idea-opts">
-          <label>Team (optional)
-            <input type="text" id="emTeam" maxlength="60" placeholder="Tech, Design, Sales…" list="emTeamList">
-          </label>
-          <label>Status
-            <select id="emStatus">
-              <option value="active">Active</option>
-              <option value="leave">On leave</option>
-              <option value="left">Left</option>
-            </select>
-          </label>
-        </div>
-        <datalist id="emTeamList"></datalist>
-        <div class="idea-opts">
-          <label>Joining date (optional)
-            <input type="date" id="emJoined">
-          </label>
-          <label>Salary (optional)
-            <input type="text" id="emSalary" maxlength="40" placeholder="e.g. ₹25,000 / month">
-          </label>
-        </div>
-        <label>Skills (optional)
-          <input type="text" id="emSkills" maxlength="300" placeholder="Flutter, Firebase, Figma…">
+        <label>Full name
+          <input type="text" id="emName" maxlength="100" required>
         </label>
-        <label>Address (optional)
-          <textarea id="emAddress" rows="2" maxlength="500"></textarea>
+        <label>Gmail id
+          <input type="text" id="emGmail" maxlength="120" placeholder="name@gmail.com" spellcheck="false">
         </label>
-        <label>Emergency contact (optional)
-          <input type="text" id="emEmergency" maxlength="120" placeholder="Name and phone">
-        </label>
-        <label>Notes (optional)
-          <textarea id="emNote" rows="3" maxlength="2000" placeholder="Work done, documents received, anything else…"></textarea>
+        <p class="hint">For each one, type the username or paste the full link.</p>
+        <div class="idea-opts">
+          <label>Instagram
+            <input type="text" id="emInsta" maxlength="200" placeholder="@username or link" spellcheck="false">
+          </label>
+          <label>LinkedIn
+            <input type="text" id="emLinkedin" maxlength="200" placeholder="username or link" spellcheck="false">
+          </label>
+        </div>
+        <div class="idea-opts">
+          <label>X (Twitter)
+            <input type="text" id="emX" maxlength="200" placeholder="@username or link" spellcheck="false">
+          </label>
+          <label>Facebook
+            <input type="text" id="emFacebook" maxlength="200" placeholder="username or link" spellcheck="false">
+          </label>
+        </div>
+        <label>Reddit
+          <input type="text" id="emReddit" maxlength="200" placeholder="u/username or link" spellcheck="false">
         </label>
         <div class="form-row">
           <button type="submit" class="primary-btn" id="emSave">Save employee</button>
@@ -636,18 +613,12 @@
     <section class="card" aria-label="Employees">
       <div class="card-head">
         <h2>Employees</h2>
-        <span class="count-pill"><strong id="emCount">0</strong> active</span>
+        <span class="count-pill"><strong id="emCount">0</strong> people</span>
       </div>
       <div class="ak-tools">
-        <input type="search" id="emSearch" placeholder="Search name, role, skills…" aria-label="Search employees">
-        <select id="emFilter" aria-label="Filter by status">
-          <option value="">Everyone</option>
-          <option value="active">Active</option>
-          <option value="leave">On leave</option>
-          <option value="left">Left</option>
-        </select>
+        <input type="search" id="emSearch" placeholder="Search by name or id…" aria-label="Search employees">
       </div>
-      <ul class="emp-grid" id="emList"></ul>
+      <ul class="row-list emp-list" id="emList"></ul>
       <p class="empty" id="emEmpty">No employees added yet.</p>
     </section>
   </main>
@@ -796,7 +767,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=31"></script>
-  <script src="team.js?v=31"></script>
+  <script src="app.js?v=32"></script>
+  <script src="team.js?v=32"></script>
 </body>
 </html>

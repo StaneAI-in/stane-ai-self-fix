@@ -1336,7 +1336,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames(); renderTaskPopup();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames(); renderTaskPopup(); setupFormPops();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -1480,80 +1480,81 @@
     ids.forEach(function (id) {
       var k = state.apiKeys[id];
       var li = document.createElement('li');
-      li.className = 'board-item ak-item' + (id === akEditing ? ' editing' : '');
-      li.dataset.id = id;
-
-      var top = document.createElement('div');
-      top.className = 'ak-top';
-      var title = document.createElement('strong');
-      title.className = 'cred-title';
-      title.textContent = k.name;
-      top.appendChild(title);
-      var own = document.createElement('span');
-      own.className = 'count-pill ak-owner ' + ownerOf(k);
-      own.textContent = nameOf(ownerOf(k)) + "'s key";
-      top.appendChild(own);
-      if (k.project) {
-        var tag = document.createElement('span');
-        tag.className = 'count-pill';
-        tag.textContent = k.project;
-        top.appendChild(tag);
-      }
-      if (k.expiry) {
-        var left = daysUntil(k.expiry);
-        if (left <= 30) {
-          var exp = document.createElement('span');
-          exp.className = 'count-pill ak-expiry' + (left < 0 ? ' gone' : ' soon');
-          exp.textContent = left < 0 ? 'Expired' : left === 0 ? 'Expires today' : 'Expires in ' + left + ' day' + (left === 1 ? '' : 's');
-          top.appendChild(exp);
-        }
-      }
-      li.appendChild(top);
-
-      var row = document.createElement('div');
-      row.className = 'cred-line';
-      var val = document.createElement('code');
-      val.className = 'cred-val ak-val';
-      val.textContent = akMasked ? maskKey(k.key) : k.key;
-      row.appendChild(val);
-      row.appendChild(akButton('ak-copy', 'Copy', id, 'Copy key: ' + k.name));
-      row.appendChild(akButton('ak-copy-env', 'Copy .env', id, 'Copy as env line: ' + k.name));
-      li.appendChild(row);
-
-      var meta = [envNameOf(k)];
-      if (k.limit) meta.push('Free limit: ' + k.limit);
-      if (k.expiry) meta.push('Expires ' + shortKey(k.expiry) + ' ' + k.expiry.slice(0, 4));
-      if (k.by) meta.push('Added by ' + nameOf(k.by));
-      if (k.updated) meta.push('Updated ' + shortStamp(k.updated));
-      var m = document.createElement('p');
-      m.className = 'ak-meta';
-      m.textContent = meta.join(' · ');
-      li.appendChild(m);
-
-      if (k.note) {
-        var n = document.createElement('p');
-        n.className = 'ak-note';
-        n.textContent = k.note;
-        li.appendChild(n);
-      }
-
-      var actions = document.createElement('div');
-      actions.className = 'ak-actions';
-      if (k.link && /^https?:\/\//i.test(k.link)) {
-        var a = document.createElement('a');
-        a.className = 'mini-btn';
-        a.href = k.link;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = 'Open dashboard';
-        actions.appendChild(a);
-      }
-      actions.appendChild(akButton('ak-edit', 'Edit', id, 'Edit: ' + k.name));
-      actions.appendChild(akButton('ak-del', 'Delete', id, 'Delete: ' + k.name));
-      li.appendChild(actions);
-
+      li.className = 'row-item';
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'row-open';
+      b.dataset.open = id;
+      var chips = [pill(nameOf(ownerOf(k)) + "'s", 'ak-owner ' + ownerOf(k))];
+      if (k.project) chips.push(pill(k.project));
+      var ex = expiryChip(k);
+      if (ex) chips.push(ex);
+      rowText(b, k.name, envNameOf(k), chips);
+      li.appendChild(b);
       ak.list.appendChild(li);
     });
+  }
+  function expiryChip(k) {
+    if (!k.expiry) return null;
+    var left = daysUntil(k.expiry);
+    if (left > 30) return null;
+    return pill(left < 0 ? 'Expired' : left === 0 ? 'Expires today' : 'Expires in ' + left + ' day' + (left === 1 ? '' : 's'),
+      'ak-expiry' + (left < 0 ? ' gone' : ' soon'));
+  }
+  function keyDetail(card, id) {
+    var k = state.apiKeys[id];
+    if (!k) return false;
+    var chips = [pill(nameOf(ownerOf(k)) + "'s key", 'ak-owner ' + ownerOf(k))];
+    if (k.project) chips.push(pill(k.project));
+    var ex = expiryChip(k);
+    if (ex) chips.push(ex);
+    detailHead(card, k.name, envNameOf(k), chips);
+    var val = document.createElement('code');
+    val.className = 'cred-val ak-val detail-key';
+    val.textContent = akMasked ? maskKey(k.key) : k.key;
+    card.appendChild(val);
+    var dl = document.createElement('dl');
+    dl.className = 'emp-dl';
+    detailRow(dl, 'Free limit', k.limit);
+    detailRow(dl, 'Expires', k.expiry ? shortKey(k.expiry) + ' ' + k.expiry.slice(0, 4) : '');
+    detailRow(dl, 'Notes', k.note);
+    if (dl.children.length) card.appendChild(dl);
+    var meta = byLine(k);
+    if (meta) card.appendChild(para('ak-meta detail-meta', meta));
+    var buttons = [akButton('ak-copy primary-mini', 'Copy key', id), akButton('ak-copy-env', 'Copy .env line', id)];
+    if (k.link && /^https?:\/\//i.test(k.link)) {
+      var a = document.createElement('a');
+      a.className = 'mini-btn';
+      a.href = k.link;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Open dashboard';
+      buttons.push(a);
+    }
+    buttons.push(akButton('ak-edit', 'Edit', id), akButton('ak-del', 'Delete', id));
+    detailActions(card, buttons);
+  }
+  function openKey(id) {
+    openDetail(function (card) { return keyDetail(card, id); }, onKeyButton);
+  }
+  function onKeyButton(btn) {
+    var id = btn.dataset.id, k = state.apiKeys[id];
+    if (!k) return;
+    if (btn.classList.contains('ak-copy') || btn.classList.contains('ak-copy-env')) {
+      copyWithFlash(btn, btn.classList.contains('ak-copy') ? k.key : envNameOf(k) + '=' + k.key);
+    } else if (btn.classList.contains('ak-edit')) {
+      closeDetail();
+      startKeyEdit(id);
+    } else if (btn.classList.contains('ak-del')) {
+      armOrRun(btn, function () {
+        closeDetail();
+        delete state.apiKeys[id];
+        stamp('ak:' + id);
+        if (akEditing === id) resetKeyForm();
+        save();
+        renderKeys();
+      });
+    }
   }
 
   // Adds keys, skipping any whose value is already saved. Used by "Paste many" and by the
@@ -1624,8 +1625,7 @@
     ak.cancel.hidden = false;
     setAkMsg(ak.msg, '', '');
     renderKeys();
-    ak.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    ak.name.focus();
+    openFormFor(ak.form);
   }
 
   if (ak.form) {
@@ -1689,32 +1689,16 @@
       }, function () { setAkMsg(ak.toolMsg, 'Copy was blocked by the browser.', 'error'); });
     });
     ak.list.addEventListener('click', function (e) {
-      var btn = e.target.closest('button.mini-btn');
-      if (!btn) return;
-      var id = btn.dataset.id, k = state.apiKeys[id];
-      if (!k) return;
-      if (btn.classList.contains('ak-copy') || btn.classList.contains('ak-copy-env')) {
-        var text = btn.classList.contains('ak-copy') ? k.key : envNameOf(k) + '=' + k.key;
-        copyText(text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
-      } else if (btn.classList.contains('ak-edit')) {
-        startKeyEdit(id);
-      } else if (btn.classList.contains('ak-del')) {
-        armOrRun(btn, function () {
-          delete state.apiKeys[id];
-          stamp('ak:' + id);
-          if (akEditing === id) resetKeyForm();
-          save();
-          renderKeys();
-        });
-      }
+      var open = e.target.closest('.row-open');
+      if (open) openKey(open.dataset.open);
     });
   }
 
   if (typeof window.STANE_MOVE_PERSONAL_KEYS === 'function') window.STANE_MOVE_PERSONAL_KEYS();
 
   /* ---------------- Prompts, GitHub repos, Employees (shared, both can edit) ---------------- */
-  // Each is a simple list kept in the team data file: an add/edit form, a search box,
-  // a filter and a list. makeList wires up the parts they have in common.
+  // Every list works the same way: an "Add" button opens the form in a popup, the list
+  // shows only names, and clicking a name opens its details in a second popup.
   function textOf(v) { return String(v == null ? '' : v); }
   function pill(text, cls) {
     var s = document.createElement('span');
@@ -1727,7 +1711,7 @@
     b.type = 'button';
     b.className = 'mini-btn ' + cls;
     b.textContent = text;
-    b.dataset.id = id;
+    if (id) b.dataset.id = id;
     if (label) b.setAttribute('aria-label', label);
     return b;
   }
@@ -1737,7 +1721,12 @@
     if (item.updated) parts.push('Updated ' + shortStamp(item.updated));
     return parts.join(' · ');
   }
-  // Fills a filter <select> with "all" plus the groups in use, keeping the current choice.
+  function para(cls, text) {
+    var p = document.createElement('p');
+    p.className = cls;
+    p.textContent = text;
+    return p;
+  }
   function fillGroupFilter(sel, allText, groups) {
     if (!sel || document.activeElement === sel) return;
     var chosen = sel.value;
@@ -1755,18 +1744,190 @@
     dl.textContent = '';
     groups.forEach(function (g) { var o = document.createElement('option'); o.value = g; dl.appendChild(o); });
   }
+  function groupsOf(part, key) {
+    var g = {};
+    Object.keys(state[part]).forEach(function (id) { var v = textOf(state[part][id][key]).trim(); if (v) g[v] = true; });
+    return Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
+  }
+  function hay(item, keys) { return keys.map(function (k) { return textOf(item[k]); }).join(' ').toLowerCase(); }
+  function copyWithFlash(btn, text) {
+    copyText(text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+  }
 
-  // cfg: part, prefix, ids (form, head, save, cancel, msg, list, empty, count, search, filter),
-  // fields { formId: itemKey }, required [itemKey], titles { add, edit(item), save, saveEdit },
-  // read(values, old) -> item or error string, matches(item, q, f), sort(a, b), renderItem(id, item) -> li,
-  // render extra (optional), onClick(btn, id, item) for buttons other than edit/delete.
+  /* ----- popups: one for details, one per add form ----- */
+  var shades = [];
+  function makeShade(cls) {
+    var box = document.createElement('div');
+    box.className = 'plan-shade ' + (cls || '');
+    box.hidden = true;
+    document.body.appendChild(box);
+    shades.push(box);
+    return box;
+  }
+  function syncModalClass() {
+    // Any open popup (these, the idea plan, the tasks popup) keeps the page from scrolling.
+    var anyOpen = !!document.querySelector('.plan-shade:not([hidden])');
+    document.documentElement.classList.toggle('modal-open', anyOpen);
+  }
+  function closeButton() {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pop-close';
+    b.setAttribute('aria-label', 'Close');
+    b.textContent = '✕';
+    return b;
+  }
+
+  // Details popup. render(card) fills it and returns false if the item no longer exists.
+  var detail = { box: null, render: null, onClick: null };
+  function openDetail(render, onClick) {
+    detail.render = render;
+    detail.onClick = onClick;
+    drawDetail(true);
+  }
+  function closeDetail() {
+    detail.render = null;
+    if (detail.box) { detail.box.hidden = true; detail.box.textContent = ''; }
+    syncModalClass();
+  }
+  function drawDetail(focus) {
+    if (!detail.render) return;
+    if (!detail.box) {
+      detail.box = makeShade('detail-shade');
+      detail.box.addEventListener('click', function (e) {
+        if (e.target === detail.box || e.target.closest('.pop-close')) { closeDetail(); return; }
+        var btn = e.target.closest('button');
+        if (btn && detail.onClick) detail.onClick(btn, e);
+      });
+    }
+    var card = document.createElement('section');
+    card.className = 'card plan-card detail-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    var x = closeButton();
+    card.appendChild(x);
+    if (detail.render(card) === false) { closeDetail(); return; }
+    var heading = card.querySelector('h2');
+    if (heading) { heading.id = 'detailTitle'; card.setAttribute('aria-labelledby', 'detailTitle'); }
+    detail.box.textContent = '';
+    detail.box.appendChild(card);
+    detail.box.hidden = false;
+    syncModalClass();
+    if (focus) x.focus();
+  }
+  function detailHead(card, title, sub, chips) {
+    var top = document.createElement('div');
+    top.className = 'detail-top';
+    var h = document.createElement('h2');
+    h.className = 'detail-title';
+    h.textContent = title;
+    top.appendChild(h);
+    if (sub) top.appendChild(para('detail-sub', sub));
+    if (chips && chips.length) {
+      var row = document.createElement('div');
+      row.className = 'detail-chips';
+      chips.forEach(function (c) { row.appendChild(c); });
+      top.appendChild(row);
+    }
+    card.appendChild(top);
+  }
+  function detailActions(card, buttons) {
+    var row = document.createElement('div');
+    row.className = 'detail-actions';
+    buttons.forEach(function (b) { if (b) row.appendChild(b); });
+    card.appendChild(row);
+  }
+
+  // Add-form popups. Moves an existing form (or its whole card) into a popup and puts an
+  // "Add" button in the list's header. The popup closes itself after a successful save.
+  var formPops = [];
+  function popForm(cfg) {
+    var form = $(cfg.form);
+    if (!form || form.dataset.popped) return;
+    form.dataset.popped = '1';
+    var tab = $(cfg.tab);
+    var section = form.closest('section');
+    var moveWhole = cfg.whole && section;
+    var box = makeShade('form-shade');
+    var card;
+    if (moveWhole) {
+      card = section;
+      card.classList.add('plan-card', 'form-card');
+    } else {
+      card = document.createElement('section');
+      card.className = 'card plan-card form-card';
+      var h = document.createElement('h2');
+      h.textContent = cfg.title;
+      card.appendChild(h);
+      (cfg.extra || []).forEach(function (id) { var n = $(id); if (n) card.appendChild(n); });
+      card.insertBefore(form, card.children[1] || null);
+    }
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.insertBefore(closeButton(), card.firstChild);
+    box.appendChild(card);
+    if (moveWhole && tab) tab.classList.add('one-col');
+
+    var pop = { form: form, box: box, pending: false };
+    formPops.push(pop);
+    function close() {
+      if (box.hidden) return;
+      box.hidden = true;
+      syncModalClass();
+      // Leaving in the middle of an edit cancels it, so the next "Add" starts empty.
+      var cancel = card.querySelector('[id$="Cancel"]');
+      if (cancel && !cancel.hidden) cancel.click();
+    }
+    pop.open = function () {
+      card.querySelectorAll('.form-msg').forEach(function (m) { m.textContent = ''; });
+      box.hidden = false;
+      syncModalClass();
+      var first = card.querySelector('input:not([type=hidden]):not([type=file]), textarea, select');
+      if (first) setTimeout(function () { first.focus(); }, 30);
+    };
+    pop.close = close;
+    box.addEventListener('click', function (e) {
+      if (e.target === box || e.target.closest('.pop-close')) close();
+    });
+    card.addEventListener('submit', function () { pop.pending = true; }, true);
+    new MutationObserver(function () {
+      if (!pop.pending) return;
+      var ok = [].some.call(card.querySelectorAll('.form-msg'), function (m) {
+        return m.classList.contains('ok') && m.textContent.trim();
+      });
+      if (ok) { pop.pending = false; setTimeout(close, 450); }
+    }).observe(card, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+
+    var host = typeof cfg.host === 'function' ? cfg.host() : document.querySelector(cfg.host);
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'primary-btn add-open';
+    add.textContent = '+ ' + cfg.label;
+    add.addEventListener('click', pop.open);
+    if (host) host.appendChild(add);
+  }
+  function openFormFor(form) {
+    for (var i = 0; i < formPops.length; i++) if (formPops[i].form === form) { formPops[i].open(); return true; }
+    return false;
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = formPops.filter(function (p) { return !p.box.hidden; })[0];
+    if (open) { open.close(); return; }
+    if (detail.render) closeDetail();
+  });
+
+  /* ----- list engine ----- */
+  // cfg: part, prefix, ids, fields, required, titles, read(values, old, id), matches(item, q, f), sort(a, b),
+  // row(id, item) -> element for the list, detail(card, id, item), onDetail(btn, id, item),
+  // group(item) -> group name (optional), groupOrder(names) (optional), groupTools(name, ids) (optional).
   function makeList(cfg) {
     var f = {};
     Object.keys(cfg.ids).forEach(function (k) { f[k] = $(cfg.ids[k]); });
     var inputs = {};
     Object.keys(cfg.fields).forEach(function (id) { inputs[cfg.fields[id]] = $(id); });
     var editing = '';
-    var list = { editing: function () { return editing; } };
+    var list = {};
 
     function ids() {
       var q = f.search ? f.search.value.trim().toLowerCase() : '';
@@ -1775,16 +1936,46 @@
         return cfg.matches(state[cfg.part][id], q, fv);
       }).sort(function (a, b) { return cfg.sort(state[cfg.part][a], state[cfg.part][b]); });
     }
+    function rowItem(id) {
+      var li = document.createElement('li');
+      li.className = 'row-item';
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'row-open';
+      b.dataset.open = id;
+      cfg.row(b, id, state[cfg.part][id]);
+      li.appendChild(b);
+      return li;
+    }
     list.render = function () {
       if (!f.list) return;
       if (cfg.renderExtra) cfg.renderExtra(f);
       var shown = ids();
       f.list.textContent = '';
-      shown.forEach(function (id) {
-        var li = cfg.renderItem(id, state[cfg.part][id]);
-        if (id === editing) li.classList.add('editing');
-        f.list.appendChild(li);
-      });
+      if (cfg.group) {
+        var groups = {};
+        shown.forEach(function (id) { var g = cfg.group(state[cfg.part][id]); (groups[g] = groups[g] || []).push(id); });
+        var names = cfg.groupOrder ? cfg.groupOrder(Object.keys(groups)) : Object.keys(groups).sort();
+        names.forEach(function (g) {
+          var sec = document.createElement('li');
+          sec.className = 'row-group';
+          var head = document.createElement('div');
+          head.className = 'row-group-head';
+          var h = document.createElement('h3');
+          h.textContent = g;
+          head.appendChild(h);
+          head.appendChild(pill(String(groups[g].length)));
+          if (cfg.groupTools) cfg.groupTools(g, groups[g]).forEach(function (t) { head.appendChild(t); });
+          sec.appendChild(head);
+          var ul = document.createElement('ul');
+          ul.className = 'row-list';
+          groups[g].forEach(function (id) { ul.appendChild(rowItem(id)); });
+          sec.appendChild(ul);
+          f.list.appendChild(sec);
+        });
+      } else {
+        shown.forEach(function (id) { f.list.appendChild(rowItem(id)); });
+      }
       var total = Object.keys(state[cfg.part]).length;
       if (f.count) f.count.textContent = cfg.count ? cfg.count() : total;
       f.empty.hidden = shown.length > 0;
@@ -1797,6 +1988,23 @@
       f.save.textContent = cfg.titles.save;
       f.cancel.hidden = true;
     }
+    list.open = function (id) {
+      openDetail(function (card) {
+        var item = state[cfg.part][id];
+        if (!item) return false;
+        cfg.detail(card, id, item);
+        var meta = byLine(item);
+        if (meta) card.appendChild(para('ak-meta detail-meta', meta));
+        detailActions(card, (cfg.detailButtons ? cfg.detailButtons(id, item) : []).concat([
+          miniBtn('row-edit', 'Edit', id), miniBtn('row-del', 'Delete', id)]));
+      }, function (btn) {
+        var item = state[cfg.part][id];
+        if (!item) return;
+        if (btn.classList.contains('row-edit')) { closeDetail(); list.edit(id); }
+        else if (btn.classList.contains('row-del')) armOrRun(btn, function () { closeDetail(); list.remove(id); });
+        else if (cfg.onDetail) cfg.onDetail(btn, id, item);
+      });
+    };
     list.edit = function (id) {
       var item = state[cfg.part][id];
       if (!item) return;
@@ -1806,10 +2014,7 @@
       f.save.textContent = 'Save changes';
       f.cancel.hidden = false;
       setAkMsg(f.msg, '', '');
-      list.render();
-      f.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      var first = inputs[cfg.required[0]];
-      if (first) first.focus();
+      openFormFor(f.form);
     };
     list.remove = function (id) {
       delete state[cfg.part][id];
@@ -1840,39 +2045,35 @@
       reset();
       list.render();
       setAkMsg(f.msg, wasEdit ? 'Changes saved.' : 'Saved.', 'ok');
-      if (cfg.afterSave) cfg.afterSave(id);
     });
-    f.cancel.addEventListener('click', function () { reset(); setAkMsg(f.msg, '', ''); list.render(); });
+    f.cancel.addEventListener('click', function () { reset(); setAkMsg(f.msg, '', ''); });
     if (f.search) f.search.addEventListener('input', list.render);
     if (f.filter) f.filter.addEventListener('change', list.render);
     f.list.addEventListener('click', function (e) {
-      var btn = e.target.closest('button');
-      var id = btn ? btn.dataset.id : '';
-      if (btn && id && state[cfg.part][id]) {
-        if (btn.classList.contains('row-edit')) { list.edit(id); return; }
-        if (btn.classList.contains('row-del')) { armOrRun(btn, function () { list.remove(id); }); return; }
-      }
-      if (cfg.onClick) cfg.onClick(e, btn);
+      var open = e.target.closest('.row-open');
+      if (open) { list.open(open.dataset.open); return; }
+      var tool = e.target.closest('button');
+      if (tool && cfg.onGroupTool) cfg.onGroupTool(tool);
     });
     return list;
   }
-  function rowActions(id, label) {
-    var actions = document.createElement('div');
-    actions.className = 'ak-actions';
-    actions.appendChild(miniBtn('row-edit', 'Edit', id, 'Edit: ' + label));
-    actions.appendChild(miniBtn('row-del', 'Delete', id, 'Delete: ' + label));
-    return actions;
+  function rowText(b, title, sub, chips) {
+    var t = document.createElement('span');
+    t.className = 'row-title';
+    t.textContent = title;
+    b.appendChild(t);
+    if (sub) { var s = document.createElement('span'); s.className = 'row-sub'; s.textContent = sub; b.appendChild(s); }
+    (chips || []).forEach(function (c) { b.appendChild(c); });
+    var arrow = document.createElement('span');
+    arrow.className = 'row-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '›';
+    b.appendChild(arrow);
   }
-  function groupsOf(part, key) {
-    var g = {};
-    Object.keys(state[part]).forEach(function (id) { var v = textOf(state[part][id][key]).trim(); if (v) g[v] = true; });
-    return Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
-  }
-  function hay(item, keys) { return keys.map(function (k) { return textOf(item[k]); }).join(' ').toLowerCase(); }
 
   /* ----- Prompts ----- */
   var prompts = makeList({
-    part: 'prompts', prefix: 'pm', emptyText: 'No prompts saved yet.',
+    part: 'prompts', prefix: 'pm', emptyText: 'No prompts saved yet. Use "+ Add prompt".',
     ids: { form: 'pmForm', head: 'pmHead', save: 'pmSave', cancel: 'pmCancel', msg: 'pmMsg', list: 'pmList',
       empty: 'pmEmpty', count: 'pmCount', search: 'pmSearch', filter: 'pmFilter' },
     fields: { pmTitle: 'title', pmText: 'text', pmGroup: 'group', pmNote: 'note' },
@@ -1883,58 +2084,29 @@
       if (f && textOf(p.group) !== f) return false;
       return !q || hay(p, ['title', 'text', 'group', 'note']).indexOf(q) !== -1;
     },
-    sort: function (a, b) { return (b.updated || 0) - (a.updated || 0); },
+    sort: function (a, b) { return textOf(a.title).localeCompare(textOf(b.title)); },
     renderExtra: function (f) {
       var g = groupsOf('prompts', 'group');
       fillGroupFilter(f.filter, 'All categories', g);
       fillDatalist($('pmGroupList'), g);
     },
-    renderItem: function (id, p) {
-      var li = document.createElement('li');
-      li.className = 'board-item pm-item';
-      var top = document.createElement('div');
-      top.className = 'ak-top';
-      var t = document.createElement('strong');
-      t.className = 'cred-title';
-      t.textContent = p.title;
-      top.appendChild(t);
-      if (p.group) top.appendChild(pill(p.group));
-      li.appendChild(top);
-      var body = document.createElement('pre');
-      body.className = 'pm-text' + (pmOpen[id] ? ' open' : '');
-      body.textContent = p.text;
-      li.appendChild(body);
-      if (p.note) {
-        var n = document.createElement('p');
-        n.className = 'ak-note';
-        n.textContent = p.note;
-        li.appendChild(n);
-      }
-      var m = document.createElement('p');
-      m.className = 'ak-meta';
-      m.textContent = byLine(p);
-      li.appendChild(m);
-      var actions = rowActions(id, p.title);
-      actions.insertBefore(miniBtn('pm-more', pmOpen[id] ? 'Show less' : 'Show all', id), actions.firstChild);
-      actions.insertBefore(miniBtn('pm-copy', 'Copy prompt', id, 'Copy prompt: ' + p.title), actions.firstChild);
-      li.appendChild(actions);
-      return li;
+    row: function (b, id, p) { rowText(b, p.title, '', p.group ? [pill(p.group)] : []); },
+    detail: function (card, id, p) {
+      detailHead(card, p.title, '', p.group ? [pill(p.group)] : []);
+      var pre = document.createElement('pre');
+      pre.className = 'pm-text open';
+      pre.textContent = p.text;
+      card.appendChild(pre);
+      if (p.note) card.appendChild(para('ak-note', p.note));
     },
-    onClick: function (e, btn) {
-      if (!btn) return;
-      var p = state.prompts[btn.dataset.id];
-      if (!p) return;
-      if (btn.classList.contains('pm-copy')) {
-        copyText(p.text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
-      } else if (btn.classList.contains('pm-more')) {
-        pmOpen[btn.dataset.id] = !pmOpen[btn.dataset.id];
-        prompts.render();
-      }
-    }
+    detailButtons: function (id) { return [miniBtn('pm-copy primary-mini', 'Copy prompt', id)]; },
+    onDetail: function (btn, id, p) { if (btn.classList.contains('pm-copy')) copyWithFlash(btn, p.text); }
   });
-  var pmOpen = {};
 
   /* ----- GitHub repos ----- */
+  // Suggested categories for repos that make Claude more capable; any other name works too.
+  var REPO_CATS = ['Web design', 'Frontend', 'Backend', 'Security', 'Claude skills & plugins', 'AI agents & MCP',
+    'Prompts', 'Automation', 'Testing', 'DevOps', 'Data & ML', 'Mobile', 'Other'];
   // "https://github.com/owner/repo(.git)(/…)" or "owner/repo" -> { url, path } (path = "owner/repo").
   function parseRepo(input) {
     var s = textOf(input).trim().replace(/\.git$/i, '').replace(/\/+$/, '');
@@ -1945,8 +2117,19 @@
     var u = safeUrl(s);
     return u ? { url: u, path: '' } : null;
   }
+  function repoCat(r) { return textOf(r.group).trim() || 'Other'; }
+  // Known categories first in their usual order, then any others A–Z, "Other" last.
+  function orderCats(names) {
+    return names.slice().sort(function (a, b) {
+      var ia = REPO_CATS.indexOf(a), ib = REPO_CATS.indexOf(b);
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      return a.localeCompare(b);
+    });
+  }
   var repos = makeList({
-    part: 'repos', prefix: 'gh', emptyText: 'No repositories saved yet.',
+    part: 'repos', prefix: 'gh', emptyText: 'No repositories saved yet. Use "+ Add repo".',
     ids: { form: 'ghForm', head: 'ghHead', save: 'ghSave', cancel: 'ghCancel', msg: 'ghMsg', list: 'ghList',
       empty: 'ghEmpty', count: 'ghCount', search: 'ghSearch', filter: 'ghFilter' },
     fields: { ghUrl: 'url', ghName: 'name', ghNote: 'note', ghGroup: 'group', ghBranch: 'branch', ghVis: 'vis' },
@@ -1961,137 +2144,87 @@
         note: v.note, group: v.group, branch: v.branch, vis: v.vis === 'public' ? 'public' : 'private' };
     },
     matches: function (r, q, f) {
-      if (f && textOf(r.group) !== f) return false;
+      if (f && repoCat(r) !== f) return false;
       return !q || hay(r, ['name', 'path', 'url', 'note', 'group']).indexOf(q) !== -1;
     },
     sort: function (a, b) { return textOf(a.name).localeCompare(textOf(b.name)); },
+    group: repoCat,
+    groupOrder: orderCats,
+    groupTools: function (g, ids) {
+      var all = miniBtn('gh-copy-cat', 'Copy all links', '', 'Copy all ' + g + ' repo links');
+      all.dataset.cat = g;
+      all.dataset.ids = ids.join(',');
+      var clone = miniBtn('gh-clone-cat', 'Copy git clone', '', 'Copy git clone for all ' + g + ' repos');
+      clone.dataset.ids = ids.join(',');
+      return [all, clone];
+    },
+    onGroupTool: function (btn) {
+      var ids = (btn.dataset.ids || '').split(',').filter(function (id) { return state.repos[id]; });
+      if (!ids.length) return;
+      var lines = ids.map(function (id) {
+        var r = state.repos[id];
+        return btn.classList.contains('gh-clone-cat') ? (r.path ? 'git clone ' + r.url + '.git' : '') : r.url;
+      }).filter(Boolean);
+      if (lines.length) copyWithFlash(btn, lines.join('\n') + '\n');
+    },
     renderExtra: function (f) {
-      var g = groupsOf('repos', 'group');
-      fillGroupFilter(f.filter, 'All projects', g);
-      fillDatalist($('ghGroupList'), g);
+      var used = groupsOf('repos', 'group');
+      fillGroupFilter(f.filter, 'All categories', orderCats(used.concat(Object.keys(state.repos).some(function (id) {
+        return !textOf(state.repos[id].group).trim();
+      }) && used.indexOf('Other') === -1 ? ['Other'] : [])));
+      var suggest = REPO_CATS.slice();
+      used.forEach(function (g) { if (suggest.indexOf(g) === -1) suggest.push(g); });
+      fillDatalist($('ghGroupList'), suggest);
     },
-    renderItem: function (id, r) {
-      var li = document.createElement('li');
-      li.className = 'board-item gh-item';
-      var top = document.createElement('div');
-      top.className = 'ak-top';
-      var a = document.createElement('a');
-      a.className = 'cred-title gh-name';
-      a.href = r.url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = r.name;
-      top.appendChild(a);
-      top.appendChild(pill(r.vis === 'public' ? 'Public' : 'Private', 'gh-vis ' + (r.vis === 'public' ? 'public' : 'private')));
-      if (r.group) top.appendChild(pill(r.group));
-      li.appendChild(top);
-      var path = document.createElement('code');
-      path.className = 'cred-val gh-path';
-      path.textContent = (r.path || r.url.replace(/^https?:\/\//, '')) + (r.branch ? ' · ' + r.branch : '');
-      li.appendChild(path);
-      if (r.note) {
-        var n = document.createElement('p');
-        n.className = 'ak-note';
-        n.textContent = r.note;
-        li.appendChild(n);
-      }
-      var m = document.createElement('p');
-      m.className = 'ak-meta';
-      m.textContent = byLine(r);
-      li.appendChild(m);
-      var actions = rowActions(id, r.name);
-      if (r.path) actions.insertBefore(miniBtn('gh-clone', 'Copy git clone', id, 'Copy clone command: ' + r.name), actions.firstChild);
-      actions.insertBefore(miniBtn('gh-copy', 'Copy link', id, 'Copy link: ' + r.name), actions.firstChild);
-      li.appendChild(actions);
-      return li;
+    row: function (b, id, r) {
+      rowText(b, r.name, r.path || r.url.replace(/^https?:\/\//, ''), r.vis === 'public' ? [pill('Public', 'gh-vis public')] : []);
     },
-    onClick: function (e, btn) {
-      if (!btn) return;
-      var r = state.repos[btn.dataset.id];
-      if (!r) return;
-      var text = btn.classList.contains('gh-copy') ? r.url
-        : btn.classList.contains('gh-clone') ? 'git clone ' + r.url + '.git' : '';
-      if (text) copyText(text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+    detail: function (card, id, r) {
+      detailHead(card, r.name, r.path || r.url, [pill(repoCat(r)), pill(r.vis === 'public' ? 'Public' : 'Private', 'gh-vis ' + (r.vis === 'public' ? 'public' : 'private'))]);
+      var dl = document.createElement('dl');
+      dl.className = 'emp-dl';
+      detailRow(dl, 'Link', r.url, r.url, true);
+      detailRow(dl, 'Main branch', r.branch);
+      detailRow(dl, 'What it is', r.note);
+      card.appendChild(dl);
+    },
+    detailButtons: function (id, r) {
+      var b = [miniBtn('gh-copy primary-mini', 'Copy link', id)];
+      if (r.path) b.push(miniBtn('gh-clone', 'Copy git clone', id));
+      return b;
+    },
+    onDetail: function (btn, id, r) {
+      if (btn.classList.contains('gh-copy')) copyWithFlash(btn, r.url);
+      else if (btn.classList.contains('gh-clone')) copyWithFlash(btn, 'git clone ' + r.url + '.git');
     }
   });
 
   /* ----- Employees ----- */
-  var EMP_STATUS = { active: 'Active', leave: 'On leave', left: 'Left' };
-  function empStatusOf(e) { return EMP_STATUS[e.status] ? e.status : 'active'; }
+  // Each social field takes either a username/handle or a full link; this turns it into a link.
+  var SOCIALS = [
+    ['gmail', 'Gmail'], ['insta', 'Instagram'], ['linkedin', 'LinkedIn'], ['x', 'X'],
+    ['facebook', 'Facebook'], ['reddit', 'Reddit']];
+  function socialLink(kind, value) {
+    var v = textOf(value).trim();
+    if (!v) return '';
+    if (kind === 'gmail') return 'mailto:' + (v.indexOf('@') === -1 ? v + '@gmail.com' : v);
+    if (/^https?:\/\//i.test(v) || /^(www\.)?[\w-]+\.(com|in)\//i.test(v)) return safeUrl(v);
+    var h = v.replace(/^@/, '').replace(/^u\//i, '').replace(/\s+/g, '');
+    var base = { insta: 'https://instagram.com/', linkedin: 'https://linkedin.com/in/', x: 'https://x.com/',
+      facebook: 'https://facebook.com/', reddit: 'https://reddit.com/user/' }[kind];
+    return base ? base + encodeURIComponent(h) : '';
+  }
+  function socialLabel(kind, value) {
+    var v = textOf(value).trim();
+    if (kind === 'gmail') return v.indexOf('@') === -1 ? v + '@gmail.com' : v;
+    if (/^https?:\/\//i.test(v)) return v.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
+    return v.charAt(0) === '@' || kind === 'reddit' || kind === 'linkedin' ? v : '@' + v;
+  }
   function initials(name) {
     var p = textOf(name).trim().split(/\s+/).filter(Boolean);
     return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase();
   }
-  var empOpenId = '', empBox = null;
-  var employees = makeList({
-    part: 'employees', prefix: 'em', emptyText: 'No employees added yet.',
-    ids: { form: 'emForm', head: 'emHead', save: 'emSave', cancel: 'emCancel', msg: 'emMsg', list: 'emList',
-      empty: 'emEmpty', count: 'emCount', search: 'emSearch', filter: 'emFilter' },
-    fields: { emName: 'name', emRole: 'role', emPhone: 'phone', emEmail: 'email', emTeam: 'team', emStatus: 'status',
-      emJoined: 'joined', emSalary: 'salary', emSkills: 'skills', emAddress: 'address', emEmergency: 'emergency', emNote: 'note' },
-    required: ['name', 'role'],
-    titles: { add: 'Add an employee', save: 'Save employee', edit: function (e) { return 'Edit: ' + e.name; } },
-    read: function (v) {
-      var e = {};
-      Object.keys(v).forEach(function (k) { e[k] = v[k]; });
-      e.status = EMP_STATUS[v.status] ? v.status : 'active';
-      return e;
-    },
-    count: function () {
-      return Object.keys(state.employees).filter(function (id) { return empStatusOf(state.employees[id]) === 'active'; }).length;
-    },
-    matches: function (e, q, f) {
-      if (f && empStatusOf(e) !== f) return false;
-      return !q || hay(e, ['name', 'role', 'team', 'skills', 'phone', 'email', 'note']).indexOf(q) !== -1;
-    },
-    sort: function (a, b) {
-      var order = { active: 0, leave: 1, left: 2 };
-      return order[empStatusOf(a)] - order[empStatusOf(b)] || textOf(a.name).localeCompare(textOf(b.name));
-    },
-    renderExtra: function () { fillDatalist($('emTeamList'), groupsOf('employees', 'team')); },
-    renderItem: function (id, e) {
-      var li = document.createElement('li');
-      li.className = 'emp-item ' + empStatusOf(e);
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'emp-card';
-      b.dataset.open = id;
-      b.setAttribute('aria-label', 'Show details: ' + e.name);
-      var av = document.createElement('span');
-      av.className = 'emp-avatar';
-      av.textContent = initials(e.name);
-      var txt = document.createElement('span');
-      txt.className = 'emp-txt';
-      var n = document.createElement('strong');
-      n.textContent = e.name;
-      var r = document.createElement('span');
-      r.className = 'emp-role';
-      r.textContent = e.role + (e.team ? ' · ' + e.team : '');
-      txt.appendChild(n);
-      txt.appendChild(r);
-      b.appendChild(av);
-      b.appendChild(txt);
-      b.appendChild(pill(EMP_STATUS[empStatusOf(e)], 'emp-status ' + empStatusOf(e)));
-      li.appendChild(b);
-      return li;
-    },
-    onClick: function (ev) {
-      var card = ev.target.closest('.emp-card');
-      if (card) openEmployee(card.dataset.open);
-    },
-    afterSave: function (id) { openEmployee(id); }
-  });
-
-  function openEmployee(id) {
-    empOpenId = id;
-    renderEmployee();
-  }
-  function closeEmployee() {
-    empOpenId = '';
-    if (empBox) { empBox.hidden = true; empBox.textContent = ''; }
-    document.documentElement.classList.remove('modal-open');
-  }
-  function detailRow(dl, label, value, href) {
+  function detailRow(dl, label, value, href, external) {
     if (!value) return;
     var dt = document.createElement('dt');
     dt.textContent = label;
@@ -2100,105 +2233,119 @@
       var a = document.createElement('a');
       a.href = href;
       a.textContent = value;
+      if (external) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
       dd.appendChild(a);
     } else dd.textContent = value;
     dl.appendChild(dt);
     dl.appendChild(dd);
   }
-  function renderEmployee() {
-    var e = empOpenId && state.employees[empOpenId];
-    if (!e) { if (empOpenId) closeEmployee(); return; }
-    var id = empOpenId;
-    if (!empBox) {
-      empBox = document.createElement('div');
-      empBox.className = 'plan-shade';
-      empBox.addEventListener('click', function (ev) {
-        if (ev.target === empBox || ev.target.closest('.emp-close')) { closeEmployee(); return; }
-        var btn = ev.target.closest('button');
-        if (!btn || !state.employees[empOpenId]) return;
-        var cur = empOpenId;
-        if (btn.classList.contains('emp-edit')) { closeEmployee(); employees.edit(cur); }
-        else if (btn.classList.contains('emp-del')) armOrRun(btn, function () { closeEmployee(); employees.remove(cur); });
-        else if (btn.classList.contains('emp-copy')) {
-          copyText(btn.dataset.value).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
-        }
+  // Fields from the earlier, longer employee form, still shown if they were filled in.
+  var OLD_EMP_FIELDS = [['role', 'Role'], ['phone', 'Phone'], ['email', 'Email'], ['team', 'Team'], ['joined', 'Joined'],
+    ['salary', 'Salary'], ['skills', 'Skills'], ['address', 'Address'], ['emergency', 'Emergency contact'], ['note', 'Notes']];
+  var employees = makeList({
+    part: 'employees', prefix: 'em', emptyText: 'No employees added yet. Use "+ Add employee".',
+    ids: { form: 'emForm', head: 'emHead', save: 'emSave', cancel: 'emCancel', msg: 'emMsg', list: 'emList',
+      empty: 'emEmpty', count: 'emCount', search: 'emSearch' },
+    fields: { emName: 'name', emGmail: 'gmail', emInsta: 'insta', emLinkedin: 'linkedin', emX: 'x',
+      emFacebook: 'facebook', emReddit: 'reddit' },
+    required: ['name'],
+    titles: { add: 'Add an employee', save: 'Save employee', edit: function (e) { return 'Edit: ' + e.name; } },
+    read: function (v, old) {
+      var e = {};
+      // Keep any details from the older form so nothing is lost on edit.
+      if (old) OLD_EMP_FIELDS.forEach(function (p) { if (old[p[0]]) e[p[0]] = old[p[0]]; });
+      Object.keys(v).forEach(function (k) { e[k] = v[k]; });
+      if (e.gmail && /\s/.test(e.gmail)) return 'The Gmail id cannot have spaces.';
+      return e;
+    },
+    matches: function (e, q) {
+      return !q || hay(e, ['name', 'gmail', 'insta', 'linkedin', 'x', 'facebook', 'reddit', 'role']).indexOf(q) !== -1;
+    },
+    sort: function (a, b) { return textOf(a.name).localeCompare(textOf(b.name)); },
+    row: function (b, id, e) {
+      var av = document.createElement('span');
+      av.className = 'emp-avatar';
+      av.textContent = initials(e.name);
+      b.classList.add('emp-row');
+      b.appendChild(av);
+      rowText(b, e.name, '', []);
+    },
+    detail: function (card, id, e) {
+      var who = document.createElement('div');
+      who.className = 'emp-who';
+      var av = document.createElement('span');
+      av.className = 'emp-avatar big';
+      av.textContent = initials(e.name);
+      who.appendChild(av);
+      var h = document.createElement('h2');
+      h.className = 'detail-title';
+      h.textContent = e.name;
+      who.appendChild(h);
+      card.appendChild(who);
+      var links = document.createElement('div');
+      links.className = 'social-list';
+      SOCIALS.forEach(function (s) {
+        var href = socialLink(s[0], e[s[0]]);
+        if (!href) return;
+        var a = document.createElement('a');
+        a.className = 'social-link ' + s[0];
+        a.href = href;
+        if (s[0] !== 'gmail') { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        var k = document.createElement('span');
+        k.className = 'social-kind';
+        k.textContent = s[1];
+        var val = document.createElement('span');
+        val.className = 'social-val';
+        val.textContent = socialLabel(s[0], e[s[0]]);
+        a.appendChild(k);
+        a.appendChild(val);
+        links.appendChild(a);
       });
-      document.body.appendChild(empBox);
-    }
-    empBox.textContent = '';
-    empBox.hidden = false;
-    document.documentElement.classList.add('modal-open');
-
-    var card = document.createElement('section');
-    card.className = 'card plan-card emp-detail';
-    card.setAttribute('role', 'dialog');
-    card.setAttribute('aria-modal', 'true');
-    card.setAttribute('aria-label', e.name);
-    var top = document.createElement('div');
-    top.className = 'plan-top';
-    var who = document.createElement('div');
-    who.className = 'emp-who';
-    var av = document.createElement('span');
-    av.className = 'emp-avatar big';
-    av.textContent = initials(e.name);
-    var head = document.createElement('div');
-    var h = document.createElement('h2');
-    h.className = 'plan-title';
-    h.textContent = e.name;
-    var role = document.createElement('p');
-    role.className = 'emp-role';
-    role.textContent = e.role + (e.team ? ' · ' + e.team : '');
-    head.appendChild(h);
-    head.appendChild(role);
-    head.appendChild(pill(EMP_STATUS[empStatusOf(e)], 'emp-status ' + empStatusOf(e)));
-    who.appendChild(av);
-    who.appendChild(head);
-    var close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'ghost-btn emp-close';
-    close.textContent = 'Close';
-    top.appendChild(who);
-    top.appendChild(close);
-    card.appendChild(top);
-
-    var dl = document.createElement('dl');
-    dl.className = 'emp-dl';
-    detailRow(dl, 'Phone', e.phone, e.phone ? 'tel:' + e.phone.replace(/[^\d+]/g, '') : '');
-    detailRow(dl, 'Email', e.email, e.email ? 'mailto:' + e.email : '');
-    detailRow(dl, 'Joined', e.joined ? shortKey(e.joined) + ' ' + e.joined.slice(0, 4) : '');
-    detailRow(dl, 'Salary', e.salary);
-    detailRow(dl, 'Skills', e.skills);
-    detailRow(dl, 'Address', e.address);
-    detailRow(dl, 'Emergency contact', e.emergency);
-    detailRow(dl, 'Notes', e.note);
-    if (!dl.children.length) {
-      var none = document.createElement('p');
-      none.className = 'empty';
-      none.textContent = 'No other details yet. Use Edit to add phone, email, joining date and more.';
-      card.appendChild(none);
-    } else card.appendChild(dl);
-
-    var meta = document.createElement('p');
-    meta.className = 'ak-meta';
-    meta.textContent = byLine(e);
-    card.appendChild(meta);
-    var actions = document.createElement('div');
-    actions.className = 'ak-actions';
-    if (e.phone) { var cp = miniBtn('emp-copy', 'Copy phone', id); cp.dataset.value = e.phone; actions.appendChild(cp); }
-    if (e.email) { var ce = miniBtn('emp-copy', 'Copy email', id); ce.dataset.value = e.email; actions.appendChild(ce); }
-    actions.appendChild(miniBtn('emp-edit', 'Edit', id, 'Edit: ' + e.name));
-    actions.appendChild(miniBtn('emp-del', 'Delete', id, 'Delete: ' + e.name));
-    card.appendChild(actions);
-    empBox.appendChild(card);
-    close.focus();
-  }
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && empOpenId) closeEmployee(); });
+      if (links.children.length) card.appendChild(links);
+      else card.appendChild(para('empty', 'No Gmail or social links yet. Use Edit to add them.'));
+      var dl = document.createElement('dl');
+      dl.className = 'emp-dl';
+      OLD_EMP_FIELDS.forEach(function (p) { detailRow(dl, p[1], e[p[0]]); });
+      if (dl.children.length) card.appendChild(dl);
+    },
+    detailButtons: function (id, e) {
+      var g = e.gmail ? socialLabel('gmail', e.gmail) : '';
+      if (!g) return [];
+      var b = miniBtn('emp-copy', 'Copy Gmail', id);
+      b.dataset.value = g;
+      return [b];
+    },
+    onDetail: function (btn) { if (btn.classList.contains('emp-copy')) copyWithFlash(btn, btn.dataset.value); }
+  });
 
   function renderCollections() {
     prompts.render();
     repos.render();
     employees.render();
-    if (empOpenId) renderEmployee();
+    drawDetail(false);
+  }
+
+  // Every list tab: "+ Add" button in the list header opens the form in a popup.
+  var formPopsReady = false;
+  function setupFormPops() {
+    if (formPopsReady) return;
+    formPopsReady = true;
+    function headOf(tab) { return function () { var h = document.querySelector('#' + tab + ' .card-head'); return h; }; }
+    function headNear(formId) {
+      return function () {
+        var list = $(formId.replace('Form', 'List'));
+        var sec = list && list.closest('section');
+        return sec && sec.querySelector('.card-head');
+      };
+    }
+    popForm({ form: 'akForm', tab: 'tabKeys', whole: true, host: headOf('tabKeys'), label: 'Add API key' });
+    popForm({ form: 'pmForm', tab: 'tabPrompts', whole: true, host: headOf('tabPrompts'), label: 'Add prompt' });
+    popForm({ form: 'ghForm', tab: 'tabRepos', whole: true, host: headOf('tabRepos'), label: 'Add repo' });
+    popForm({ form: 'emForm', tab: 'tabEmployees', whole: true, host: headOf('tabEmployees'), label: 'Add employee' });
+    popForm({ form: 'tmDocForm', tab: 'tabDocs', whole: true, host: headOf('tabDocs'), label: 'Add document' });
+    popForm({ form: 'tmLinkForm', tab: 'tabLinks', title: 'Add a link', extra: ['tmLinkMsg'], host: headOf('tabLinks'), label: 'Add link' });
+    popForm({ form: 'mmDocForm', tab: 'tabPartnerDocs', title: 'Add to Mohit Mummy Docs', host: headNear('mmDocForm'), label: 'Add' });
+    popForm({ form: 'dmDocForm', tab: 'tabPartnerDocs', title: 'Add to Divyu Mummy Docs', host: headNear('dmDocForm'), label: 'Add' });
   }
 
   /* ---------------- "Your tasks" popup when the site opens ---------------- */
