@@ -889,3 +889,35 @@ html.modal-open { overflow: hidden; }
   .plan-shade { padding: 0; }
   .plan-card { min-height: 100%; border-radius: 0; }
 }
+
+/* ---------- API keys (admin only) ---------- */
+#tabKeys { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.video-form textarea#akKey { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+.ak-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+.ak-tools input[type="search"], .ak-tools select {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+.ak-tools select { flex: 0 1 170px; }
+.ak-tools input:focus, .ak-tools select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.ak-tools .ghost-btn:disabled { opacity: 0.5; cursor: default; }
+.ak-item.editing { border-color: var(--accent); }
+.ak-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ak-val { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; user-select: all; }
+.ak-meta, .ak-note { margin: 0; font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.ak-note { color: var(--text); white-space: pre-wrap; }
+.ak-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ak-actions a.mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.ak-actions .ak-del.armed { color: var(--cross); border-color: var(--cross); }
+.ak-expiry.soon { color: #e0a43a; border-color: #e0a43a; }
+.ak-expiry.gone { color: var(--cross); border-color: var(--cross); }
+@media (max-width: 860px) {
+  #tabKeys { grid-template-columns: minmax(0, 1fr); }
+}

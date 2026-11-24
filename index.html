@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=23">
-  <script src="team-key.js?v=23"></script>
-  <script src="auth.js?v=23"></script>
+  <link rel="stylesheet" href="style.css?v=24">
+  <script src="team-key.js?v=24"></script>
+  <script src="auth.js?v=24"></script>
 </head>
 <body>
   <header class="top">
@@ -37,6 +37,7 @@
     <button type="button" role="tab" id="tabBtnLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
     <button type="button" role="tab" id="tabBtnDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Documents</button>
     <button type="button" role="tab" id="tabBtnCreds" aria-controls="tabCreds" aria-selected="false" class="tab">App credentials</button>
+    <button type="button" role="tab" id="tabBtnKeys" aria-controls="tabKeys" aria-selected="false" class="tab">API keys</button>
     <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
@@ -387,6 +388,66 @@
     </section>
   </main>
 
+  <!-- ===================== API keys (Divyanshu only, plain text) ===================== -->
+  <main class="layout keys-layout" id="tabKeys" role="tabpanel" aria-labelledby="tabBtnKeys" hidden>
+    <section class="card" aria-label="Add an API key">
+      <h2 id="akFormHead">Add an API key</h2>
+      <p class="hint">Only you see this tab. Keys are saved in plain text in your private sync repo (not the team repo), so keep only free keys here.</p>
+      <form id="akForm" class="video-form" autocomplete="off">
+        <label>Service / name
+          <input type="text" id="akName" maxlength="80" placeholder="e.g. Gemini, OpenWeather, Mapbox" required>
+        </label>
+        <label>API key
+          <textarea id="akKey" rows="2" maxlength="4000" spellcheck="false" autocomplete="off" required></textarea>
+        </label>
+        <div class="idea-opts">
+          <label>Env variable (optional)
+            <input type="text" id="akEnv" maxlength="80" placeholder="GEMINI_API_KEY" spellcheck="false">
+          </label>
+          <label>Used in (optional)
+            <input type="text" id="akProject" maxlength="80" placeholder="App or project name" list="akProjectList">
+          </label>
+        </div>
+        <datalist id="akProjectList"></datalist>
+        <label>Dashboard link (optional)
+          <input type="url" id="akLink" maxlength="500" placeholder="https://…">
+        </label>
+        <div class="idea-opts">
+          <label>Free limit (optional)
+            <input type="text" id="akLimit" maxlength="80" placeholder="e.g. 1,500 requests/day">
+          </label>
+          <label>Expires on (optional)
+            <input type="date" id="akExpiry">
+          </label>
+        </div>
+        <label>Notes (optional)
+          <textarea id="akNote" rows="2" maxlength="1000" placeholder="Account used, restrictions…"></textarea>
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="akSave">Save key</button>
+          <button type="button" class="ghost-btn" id="akCancel" hidden>Cancel edit</button>
+          <span class="form-msg" id="akMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-label="Saved API keys">
+      <div class="card-head">
+        <h2>Saved keys</h2>
+        <span class="count-pill"><strong id="akCount">0</strong> saved</span>
+      </div>
+      <div class="ak-tools">
+        <input type="search" id="akSearch" placeholder="Search name, project, notes…" aria-label="Search API keys">
+        <select id="akFilter" aria-label="Filter by project"></select>
+        <button type="button" class="ghost-btn" id="akMask" aria-pressed="false">Hide keys</button>
+        <button type="button" class="ghost-btn" id="akCopyEnv">Copy as .env</button>
+      </div>
+      <p class="form-msg" id="akToolMsg" role="status"></p>
+      <ul class="board-list ak-list" id="akList"></ul>
+      <p class="empty" id="akEmpty">No API keys saved yet.</p>
+    </section>
+  </main>
+
   <!-- ===================== Ideas tab ===================== -->
   <main class="ideas-wrap" id="tabIdeas" role="tabpanel" aria-labelledby="tabBtnIdeas" hidden>
     <div class="idea-filter" role="group" aria-label="Show ideas">
@@ -531,7 +592,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=23"></script>
-  <script src="team.js?v=23"></script>
+  <script src="app.js?v=24"></script>
+  <script src="team.js?v=24"></script>
 </body>
 </html>
