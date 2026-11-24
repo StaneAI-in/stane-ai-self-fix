@@ -454,9 +454,10 @@ html.locked body > *:not(#loginGate) { display: none !important; }
 .board-form select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .board-col h2 { font-size: 1rem; }
-.board-col.todo { border-top: 3px solid var(--muted); }
-.board-col.doing { border-top: 3px solid var(--streak); }
-.board-col.done { border-top: 3px solid var(--done); }
+/* Column colour shows as a dot before the heading (a thick top border fights the rounded corners). */
+.board-col h2::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0.05em; background: var(--muted); }
+.board-col.doing h2::before { background: var(--streak); }
+.board-col.done h2::before { background: var(--done); }
 .board-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .board-item { background: var(--cell); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .board-item.done .board-text { text-decoration: line-through; color: var(--muted); }
@@ -480,7 +481,6 @@ html.locked body > *:not(#loginGate) { display: none !important; }
 /* ---------- Projects ---------- */
 .board-form input[type="text"] + input[type="text"] { flex: 2 1 200px; }
 .projects-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.project-card { border-top: 3px solid var(--accent); }
 .project-card h2 { margin: 0; overflow-wrap: anywhere; }
 .project-head-right { display: flex; align-items: center; gap: 6px; }
 .project-card .team-note { margin-bottom: 4px; }
