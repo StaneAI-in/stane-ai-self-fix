@@ -1336,7 +1336,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames(); renderTaskPopup();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -2201,6 +2201,163 @@
     if (empOpenId) renderEmployee();
   }
 
+  /* ---------------- "Your tasks" popup when the site opens ---------------- */
+  // Shows the signed-in person their pending assigned tasks once per browser session,
+  // right after the first sync (or after a few seconds if sync is slow or off).
+  var POPUP_KEY = 'stane-tasks-popup';
+  var popup = { box: null, shown: false, open: false, timer: null };
+  try { popup.shown = sessionStorage.getItem(POPUP_KEY) === '1'; } catch (e) { popup.shown = false; }
+
+  function pendingForMe() {
+    return Object.keys(state.tasks).filter(function (id) {
+      return toOf(state.tasks[id]) === ROLE && !state.done[id];
+    }).sort(function (a, b) {
+      var x = state.tasks[a], y = state.tasks[b];
+      var dx = (x.due || '9999') + (x.time || '99'), dy = (y.due || '9999') + (y.time || '99');
+      return dx < dy ? -1 : dx > dy ? 1 : x.created - y.created;
+    });
+  }
+  // "overdue" | "today" | "soon" (next 2 days) | "" for one task's due date.
+  function dueKind(t, today) {
+    if (!t.due) return '';
+    if (t.due < today) return 'overdue';
+    if (t.due === today) return 'today';
+    var d = new Date(Number(t.due.slice(0, 4)), Number(t.due.slice(5, 7)) - 1, Number(t.due.slice(8, 10)));
+    var n = new Date(); n.setHours(0, 0, 0, 0);
+    return (d - n) / 86400000 <= 2 ? 'soon' : '';
+  }
+  function greeting() {
+    var h = new Date().getHours();
+    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  }
+  function maybeShowTaskPopup() {
+    clearTimeout(popup.timer);
+    if (popup.shown || !user) return;
+    popup.shown = true;
+    try { sessionStorage.setItem(POPUP_KEY, '1'); } catch (e) { /* once per page load then */ }
+    if (pendingForMe().length) { popup.open = true; renderTaskPopup(); }
+  }
+  function closeTaskPopup() {
+    popup.open = false;
+    if (popup.box) { popup.box.hidden = true; popup.box.textContent = ''; }
+    document.documentElement.classList.remove('modal-open');
+  }
+  function openAssignedTab() {
+    var btn = document.querySelector('[data-tab="tabTasks"]') || $('tabBtnTeam');
+    if (btn) btn.click();
+  }
+  function renderTaskPopup() {
+    if (!popup.open) return;
+    var ids = pendingForMe();
+    if (!popup.box) {
+      popup.box = document.createElement('div');
+      popup.box.className = 'plan-shade task-pop-shade';
+      popup.box.addEventListener('click', function (e) {
+        if (e.target === popup.box || e.target.closest('.task-pop-later')) { closeTaskPopup(); return; }
+        if (e.target.closest('.task-pop-open')) { closeTaskPopup(); openAssignedTab(); return; }
+      });
+      popup.box.addEventListener('change', function (e) {
+        var box = e.target.closest('input[type=checkbox][data-id]');
+        if (!box || !state.tasks[box.dataset.id]) return;
+        if (box.checked) state.done[box.dataset.id] = Date.now();
+        else delete state.done[box.dataset.id];
+        stamp('d:' + box.dataset.id);
+        save();
+        render();
+      });
+      document.body.appendChild(popup.box);
+    }
+    var keepFocus = document.activeElement && popup.box.contains(document.activeElement);
+    popup.box.textContent = '';
+    popup.box.hidden = false;
+    document.documentElement.classList.add('modal-open');
+
+    var today = todayKey();
+    var overdue = ids.filter(function (id) { return dueKind(state.tasks[id], today) === 'overdue'; }).length;
+    var dueToday = ids.filter(function (id) { return dueKind(state.tasks[id], today) === 'today'; }).length;
+
+    var card = document.createElement('section');
+    card.className = 'card plan-card task-pop';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'taskPopTitle');
+
+    var top = document.createElement('div');
+    top.className = 'task-pop-top';
+    var hello = document.createElement('p');
+    hello.className = 'task-pop-hello';
+    hello.textContent = greeting() + ', ' + nameOf(ROLE);
+    var h = document.createElement('h2');
+    h.id = 'taskPopTitle';
+    h.className = 'task-pop-title';
+    h.textContent = ids.length
+      ? ids.length + ' task' + (ids.length === 1 ? '' : 's') + ' waiting for you'
+      : 'All done. Nothing pending.';
+    top.appendChild(hello);
+    top.appendChild(h);
+    if (overdue || dueToday) {
+      var chips = document.createElement('div');
+      chips.className = 'task-pop-chips';
+      if (overdue) chips.appendChild(pill(overdue + ' overdue', 'task-pop-chip overdue'));
+      if (dueToday) chips.appendChild(pill(dueToday + ' due today', 'task-pop-chip today'));
+      top.appendChild(chips);
+    }
+    card.appendChild(top);
+
+    if (ids.length) {
+      var ul = document.createElement('ul');
+      ul.className = 'task-pop-list';
+      ids.forEach(function (id) {
+        var t = state.tasks[id], kind = dueKind(t, today);
+        var li = document.createElement('li');
+        li.className = 'task-pop-item' + (kind ? ' ' + kind : '');
+        var label = document.createElement('label');
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.dataset.id = id;
+        box.setAttribute('aria-label', 'Mark done: ' + t.text);
+        var body = document.createElement('span');
+        body.className = 'task-pop-body';
+        var text = document.createElement('span');
+        text.className = 'task-pop-text';
+        text.textContent = t.text;
+        var meta = document.createElement('span');
+        meta.className = 'task-pop-meta';
+        var at = t.time ? ', ' + formatTime(t.time) : '';
+        var when = !t.due ? (t.time ? formatTime(t.time) : 'No due date')
+          : kind === 'overdue' ? 'Overdue · ' + shortKey(t.due) + at
+          : kind === 'today' ? 'Due today' + at
+          : 'Due ' + shortKey(t.due) + at;
+        meta.textContent = when + ' · From ' + nameOf(fromOf(t));
+        body.appendChild(text);
+        body.appendChild(meta);
+        label.appendChild(box);
+        label.appendChild(body);
+        li.appendChild(label);
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+    }
+
+    var row = document.createElement('div');
+    row.className = 'task-pop-actions';
+    var later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'ghost-btn task-pop-later';
+    later.textContent = ids.length ? 'Later' : 'Close';
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'primary-btn task-pop-open';
+    go.textContent = 'Open Assigned';
+    row.appendChild(later);
+    row.appendChild(go);
+    card.appendChild(row);
+    popup.box.appendChild(card);
+    if (!keepFocus) go.focus();
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && popup.open) closeTaskPopup(); });
+  popup.timer = setTimeout(maybeShowTaskPopup, 4000);
+
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
   function readToken() {
@@ -2308,6 +2465,7 @@
       if (!ok) throw new Error('Both of you were saving at the same time. It will be tried again.');
       var t = new Date();
       setStatus('ok', 'Synced at ' + formatTime(pad(t.getHours()) + ':' + pad(t.getMinutes())) + '.');
+      maybeShowTaskPopup();
     } catch (e) {
       setStatus('error', e instanceof TypeError ? 'Could not reach GitHub. Check the internet connection; it will be tried again.' : e.message);
     }

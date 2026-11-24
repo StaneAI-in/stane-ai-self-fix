@@ -120,8 +120,9 @@ h3 {
 }
 .tab:hover { background: var(--accent-soft); color: var(--text); }
 .tab.active {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  color: var(--accent-text);
+  /* Deep blues so the white label stays readable (4.5:1+) in both themes. */
+  background: linear-gradient(90deg, #0a5cc2, #0b6bd6);
+  color: #ffffff;
 }
 
 .notice {
@@ -1019,4 +1020,47 @@ html.modal-open { overflow: hidden; }
 .tabs .sync-chip + .tab-mini { margin-left: 8px; }
 @media (min-width: 900px) {
   .tabs .sync-chip + .tab-mini { margin-left: 0; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; border-radius: 0; }
+}
+
+/* ---------- "Your tasks" popup ---------- */
+.task-pop-shade { align-items: center; animation: pop-fade 0.18s ease-out; }
+.task-pop { width: min(520px, 100%); padding: 22px 22px 18px; animation: pop-rise 0.22s ease-out; }
+.task-pop-top { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.task-pop-hello { margin: 0; color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.task-pop-title { margin: 4px 0 0; font-size: 1.35rem; line-height: 1.25; }
+.task-pop-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.task-pop-chip { font-weight: 600; }
+.task-pop-chip.overdue { color: var(--cross); border-color: var(--cross); }
+.task-pop-chip.today { color: var(--warn); border-color: var(--warn); }
+.task-pop-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: min(52vh, 420px); overflow-y: auto; }
+.task-pop-item label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--cell);
+  cursor: pointer;
+}
+.task-pop-item label:hover { background: var(--cell-hover); }
+.task-pop-item.overdue label { border-left-color: var(--cross); }
+.task-pop-item.today label { border-left-color: var(--warn); }
+.task-pop-item.soon label { border-left-color: var(--accent); }
+.task-pop-item input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.task-pop-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.task-pop-text { color: var(--text); overflow-wrap: anywhere; }
+.task-pop-meta { color: var(--muted); font-size: 0.8rem; }
+.task-pop-item.overdue .task-pop-meta { color: var(--cross); }
+.task-pop-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+@keyframes pop-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .task-pop-shade, .task-pop { animation: none; }
+}
+@media (max-width: 600px) {
+  .task-pop-shade { align-items: flex-end; padding: 0; }
+  .task-pop { border-radius: 16px 16px 0 0; min-height: 0; }
+  .task-pop-actions .primary-btn { flex: 1; }
 }
