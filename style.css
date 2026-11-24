@@ -10,6 +10,7 @@
   --accent-text: #ffffff;
   --cross: #dc2626;
   --done: #16a34a;
+  --warn: #b45309;
   --streak: #ea580c;
   --streak-soft: #fff1e6;
   --cell: #f7faff;
@@ -31,6 +32,7 @@
     --accent-text: #ffffff;
     --cross: #f87171;
     --done: #4ade80;
+    --warn: #fbbf24;
     --streak: #fb923c;
     --streak-soft: #3a2616;
     --cell: #0f1520;
@@ -916,7 +918,7 @@ html.modal-open { overflow: hidden; }
 .ak-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ak-actions a.mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .ak-actions .ak-del.armed { color: var(--cross); border-color: var(--cross); }
-.ak-expiry.soon { color: #e0a43a; border-color: #e0a43a; }
+.ak-expiry.soon { color: var(--warn); border-color: var(--warn); }
 .ak-expiry.gone { color: var(--cross); border-color: var(--cross); }
 @media (max-width: 860px) {
   #tabKeys { grid-template-columns: minmax(0, 1fr); }
