@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=28">
-  <script src="team-key.js?v=28"></script>
-  <script src="auth.js?v=28"></script>
+  <link rel="stylesheet" href="style.css?v=29">
+  <script src="team-key.js?v=29"></script>
+  <script src="auth.js?v=29"></script>
 </head>
 <body data-role="member">
   <header class="top">
@@ -28,7 +28,8 @@
     <button type="button" role="tab" data-tab="tabBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
     <button type="button" role="tab" data-tab="tabLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
-    <button type="button" role="tab" data-tab="tabDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Documents</button>
+    <button type="button" role="tab" data-tab="tabDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Company documents</button>
+    <button type="button" role="tab" data-tab="tabPartnerDocs" aria-controls="tabPartnerDocs" aria-selected="false" class="tab">Partners documents</button>
     <button type="button" role="tab" data-tab="tabKeys" aria-controls="tabKeys" aria-selected="false" class="tab">API keys</button>
     <button type="button" role="tab" data-tab="tabPrompts" aria-controls="tabPrompts" aria-selected="false" class="tab">Prompts</button>
     <button type="button" role="tab" data-tab="tabRepos" aria-controls="tabRepos" aria-selected="false" class="tab">GitHub</button>
@@ -180,7 +181,7 @@
   <!-- ===================== Documents ===================== -->
   <main class="layout docs-layout" id="tabDocs" role="tabpanel" hidden>
     <section class="card" aria-label="Add a document">
-      <h2>Add a document</h2>
+      <h2>Add a company document</h2>
       <p class="hint">Upload a file (up to 10 MB), save a link, or write a note. Files are kept in your private team data on GitHub.</p>
       <form id="tmDocForm" class="video-form" autocomplete="off">
         <label>Title
@@ -201,14 +202,73 @@
         </div>
       </form>
     </section>
-    <section class="card" aria-label="Documents">
+    <section class="card" aria-label="Company documents">
       <div class="card-head">
-        <h2>Documents</h2>
+        <h2>Company documents</h2>
         <span class="count-pill"><strong id="tmDocCount">0</strong></span>
       </div>
       <ul class="board-list doc-list" id="tmDocList"></ul>
       <p class="empty" id="tmDocEmpty">No documents yet.</p>
     </section>
+  </main>
+
+  <!-- ===================== Partners documents ===================== -->
+  <main class="ideas-wrap" id="tabPartnerDocs" role="tabpanel" hidden>
+    <p class="hint">Files up to 10 MB, links or notes. Kept in the private team data on GitHub; both of you can see them.</p>
+    <div class="partner-docs">
+      <section class="card" aria-label="Mohit Mummy Docs">
+        <div class="card-head">
+          <h2>Mohit Mummy Docs</h2>
+          <span class="count-pill"><strong id="mmDocCount">0</strong></span>
+        </div>
+        <form id="mmDocForm" class="video-form" autocomplete="off">
+          <label>Title
+            <input type="text" id="mmDocTitle" maxlength="120" placeholder="e.g. Aadhaar card, PAN card" required>
+          </label>
+          <label>File (optional)
+            <input type="file" id="mmDocFile">
+          </label>
+          <label>Link (optional)
+            <input type="text" id="mmDocUrl" maxlength="500" placeholder="https://drive.google.com/…">
+          </label>
+          <label>Note (optional)
+            <textarea id="mmDocNote" rows="2" maxlength="5000"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn" id="mmDocBtn">Save document</button>
+            <span class="form-msg" id="mmDocMsg" role="status"></span>
+          </div>
+        </form>
+        <ul class="board-list doc-list" id="mmDocList"></ul>
+        <p class="empty" id="mmDocEmpty">No documents yet.</p>
+      </section>
+      <section class="card" aria-label="Divyu Mummy Docs">
+        <div class="card-head">
+          <h2>Divyu Mummy Docs</h2>
+          <span class="count-pill"><strong id="dmDocCount">0</strong></span>
+        </div>
+        <form id="dmDocForm" class="video-form" autocomplete="off">
+          <label>Title
+            <input type="text" id="dmDocTitle" maxlength="120" placeholder="e.g. Aadhaar card, PAN card" required>
+          </label>
+          <label>File (optional)
+            <input type="file" id="dmDocFile">
+          </label>
+          <label>Link (optional)
+            <input type="text" id="dmDocUrl" maxlength="500" placeholder="https://drive.google.com/…">
+          </label>
+          <label>Note (optional)
+            <textarea id="dmDocNote" rows="2" maxlength="5000"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn" id="dmDocBtn">Save document</button>
+            <span class="form-msg" id="dmDocMsg" role="status"></span>
+          </div>
+        </form>
+        <ul class="board-list doc-list" id="dmDocList"></ul>
+        <p class="empty" id="dmDocEmpty">No documents yet.</p>
+      </section>
+    </div>
   </main>
 
   <!-- ===================== API keys (shared, plain text) ===================== -->
@@ -583,6 +643,6 @@
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
     })();
   </script>
-  <script src="team.js?v=28"></script>
+  <script src="team.js?v=29"></script>
 </body>
 </html>

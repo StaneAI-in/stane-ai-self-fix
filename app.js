@@ -517,6 +517,7 @@
      ['projects', $('tabProjects'), $('tabBtnProjects')],
      ['links', $('tabLinks'), $('tabBtnLinks')],
      ['docs', $('tabDocs'), $('tabBtnDocs')],
+     ['partnerDocs', $('tabPartnerDocs'), $('tabBtnPartnerDocs')],
      ['keys', $('tabKeys'), $('tabBtnKeys')],
      ['prompts', $('tabPrompts'), $('tabBtnPrompts')],
      ['repos', $('tabRepos'), $('tabBtnRepos')],
@@ -749,7 +750,7 @@
   $('tabBtnProjects').addEventListener('click', function () { showTab('projects'); });
   $('tabBtnLinks').addEventListener('click', function () { showTab('links'); });
   $('tabBtnDocs').addEventListener('click', function () { showTab('docs'); });
-  ['keys', 'prompts', 'repos', 'employees'].forEach(function (n) {
+  ['partnerDocs', 'keys', 'prompts', 'repos', 'employees'].forEach(function (n) {
     var b = $('tabBtn' + n.charAt(0).toUpperCase() + n.slice(1));
     if (b) b.addEventListener('click', function () { showTab(n); });
   });
