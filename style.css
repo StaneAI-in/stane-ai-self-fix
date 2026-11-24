@@ -1201,7 +1201,7 @@ html.modal-open { overflow: hidden; }
 }
 
 /* =====================================================================
-   Modern theme (v2): Inter, refined neutrals, tinted navigation,
+   Modern theme (v2): Instrument Sans, refined neutrals, tinted navigation,
    card-style rows, clear focus rings. Overrides earlier rules.
    ===================================================================== */
 :root {
@@ -1237,8 +1237,7 @@ html.modal-open { overflow: hidden; }
   }
 }
 body {
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-feature-settings: "cv11", "ss01";
+  font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.006em;
 }
@@ -1247,7 +1246,7 @@ h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; }
 
 /* Header */
 .top { padding-top: 26px; padding-bottom: 14px; }
-.brand h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+.brand h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
 .tagline { font-size: 0.88rem; }
 .stat { box-shadow: none; border-radius: 12px; }
 
