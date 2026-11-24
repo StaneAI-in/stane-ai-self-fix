@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=24">
-  <script src="team-key.js?v=24"></script>
-  <script src="auth.js?v=24"></script>
+  <link rel="stylesheet" href="style.css?v=25">
+  <script src="team-key.js?v=25"></script>
+  <script src="auth.js?v=25"></script>
 </head>
 <body>
   <header class="top">
@@ -429,6 +429,18 @@
           <span class="form-msg" id="akMsg" role="status"></span>
         </div>
       </form>
+      <details class="ak-bulk">
+        <summary>Paste many at once</summary>
+        <form id="akBulkForm" class="video-form" autocomplete="off">
+          <label>One key per line, as <code>name = key</code>
+            <textarea id="akBulkText" rows="6" maxlength="20000" spellcheck="false" placeholder="groq = gsk_…&#10;tavily = tvly-…"></textarea>
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary-btn">Add all</button>
+            <span class="form-msg" id="akBulkMsg" role="status"></span>
+          </div>
+        </form>
+      </details>
     </section>
 
     <section class="card" aria-label="Saved API keys">
@@ -592,7 +604,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=24"></script>
-  <script src="team.js?v=24"></script>
+  <script src="app.js?v=25"></script>
+  <script src="team.js?v=25"></script>
 </body>
 </html>

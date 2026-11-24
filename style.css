@@ -923,3 +923,7 @@ html.modal-open { overflow: hidden; }
 @media (max-width: 860px) {
   #tabKeys { grid-template-columns: minmax(0, 1fr); }
 }
+.ak-bulk { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.ak-bulk summary { cursor: pointer; font-weight: 600; color: var(--accent); font-size: 0.9rem; }
+.ak-bulk form { margin-top: 10px; }
+.ak-bulk textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }

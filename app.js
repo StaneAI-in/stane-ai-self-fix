@@ -549,7 +549,19 @@
     if (k.env) return k.env;
     var base = String(k.name || 'KEY').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'KEY';
     if (/^[0-9]/.test(base)) base = '_' + base;
-    return /_KEY$/.test(base) ? base : base + '_API_KEY';
+    if (/_KEY$/.test(base)) return base;
+    return /(^|_)API$/.test(base) ? base + '_KEY' : base + '_API_KEY';
+  }
+  // "groq = gsk_…" or "Groq: gsk_…" per line -> [{ name: 'Groq', key: 'gsk_…' }]
+  function parseKeyLines(text) {
+    var out = [];
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      var m = /^\s*([^=:]+?)\s*[=:]\s*(\S.*?)\s*$/.exec(line);
+      if (!m) return;
+      var name = m[1].replace(/\s+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      out.push({ name: name.slice(0, 80), key: m[2].slice(0, 4000) });
+    });
+    return out;
   }
   function maskKey(v) {
     v = String(v || '');
@@ -773,6 +785,31 @@
       renderKeys();
       setAkMsg(ak.msg, wasEdit ? 'Changes saved.' : 'Key saved.', 'ok');
     });
+    var bulkForm = $('akBulkForm'), bulkText = $('akBulkText'), bulkMsg = $('akBulkMsg');
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var rows = parseKeyLines(bulkText.value);
+        if (!rows.length) { setAkMsg(bulkMsg, 'No "name = key" lines found.', 'error'); return; }
+        var have = {}, added = 0, skipped = 0, now = Date.now();
+        Object.keys(state.apiKeys).forEach(function (id) { have[state.apiKeys[id].key] = true; });
+        rows.forEach(function (r, i) {
+          if (have[r.key]) { skipped++; return; }
+          have[r.key] = true;
+          var id = newId() + i;
+          state.apiKeys[id] = {
+            name: r.name, key: r.key, env: '', project: '', link: '', limit: '', expiry: '', note: '',
+            created: now + i, updated: now
+          };
+          stamp('k:' + id);
+          added++;
+        });
+        if (added) { save(); bulkText.value = ''; }
+        renderKeys();
+        setAkMsg(bulkMsg, 'Added ' + added + ' key' + (added === 1 ? '' : 's') +
+          (skipped ? ', skipped ' + skipped + ' already saved' : '') + '.', added ? 'ok' : 'error');
+      });
+    }
     ak.cancel.addEventListener('click', function () { resetKeyForm(); setAkMsg(ak.msg, '', ''); renderKeys(); });
     ak.search.addEventListener('input', renderKeys);
     ak.filter.addEventListener('change', renderKeys);
