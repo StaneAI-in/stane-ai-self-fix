@@ -715,7 +715,10 @@ a.project-link:hover { border-color: var(--accent); }
 .tab[aria-controls="tabTeam"]::before, .tab[aria-controls="tabTasks"]::before { content: "📥"; }
 .tab[aria-controls="tabBoard"]::before { content: "✅"; }
 .tab[aria-controls="tabProjects"]::before { content: "📁"; }
-.tab[aria-controls="tabCreds"]::before { content: "🔐"; }
+.tab[aria-controls="tabKeys"]::before { content: "🔑"; }
+.tab[aria-controls="tabPrompts"]::before { content: "📝"; }
+.tab[aria-controls="tabRepos"]::before { content: "💻"; }
+.tab[aria-controls="tabEmployees"]::before { content: "👥"; }
 .tab[aria-controls="tabIdeas"]::before { content: "💡"; }
 .tab[aria-controls="tabExpenses"]::before { content: "💰"; }
 .tab[aria-controls="tabSync"]::before { content: "🔄"; }
@@ -929,3 +932,75 @@ html.modal-open { overflow: hidden; }
 .ak-bulk textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
 .ak-owner { font-weight: 600; color: var(--text); }
 .ak-owner.member { border-color: var(--accent); }
+
+/* ---------- Prompts, GitHub, Employees ---------- */
+.split-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.board-item.editing { border-color: var(--accent); }
+.pm-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 9.5em;
+  overflow: hidden;
+}
+.pm-text.open { max-height: none; }
+.gh-name { color: var(--accent); font-weight: 600; text-decoration: none; }
+.gh-name:hover { text-decoration: underline; }
+.gh-path { display: block; flex: none; }
+.gh-vis.public { color: var(--done); border-color: var(--done); }
+.emp-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.emp-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.emp-card:hover, .emp-card:focus-visible { border-color: var(--accent); background: var(--cell-hover); }
+.emp-item.left .emp-card { opacity: 0.65; }
+.emp-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.emp-avatar.big { width: 56px; height: 56px; font-size: 1.15rem; }
+.emp-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.emp-txt strong { overflow-wrap: anywhere; }
+.emp-role { color: var(--muted); font-size: 0.82rem; margin: 0 0 4px; overflow-wrap: anywhere; }
+.emp-status.active { color: var(--done); border-color: var(--done); }
+.emp-status.leave { color: var(--warn); border-color: var(--warn); }
+.emp-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.emp-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 16px 0 8px; font-size: 0.92rem; }
+.emp-dl dt { color: var(--muted); font-weight: 600; }
+.emp-dl dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.emp-dl a { color: var(--accent); }
+@media (max-width: 860px) {
+  .split-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Projects: two parts ---------- */
+.project-name-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--accent); }
+.project-name-link:hover { color: var(--accent); }
+.project-name-link::after { content: " ↗"; font-size: 0.8em; color: var(--accent); }

@@ -517,8 +517,10 @@
      ['projects', $('tabProjects'), $('tabBtnProjects')],
      ['links', $('tabLinks'), $('tabBtnLinks')],
      ['docs', $('tabDocs'), $('tabBtnDocs')],
-     ['creds', $('tabCreds'), $('tabBtnCreds')],
      ['keys', $('tabKeys'), $('tabBtnKeys')],
+     ['prompts', $('tabPrompts'), $('tabBtnPrompts')],
+     ['repos', $('tabRepos'), $('tabBtnRepos')],
+     ['employees', $('tabEmployees'), $('tabBtnEmployees')],
      ['ideas', $('tabIdeas'), $('tabBtnIdeas')],
      ['expenses', $('tabExpenses'), $('tabBtnExpenses')],
      ['sync', el.tabSync, el.tabBtnSync]].forEach(function (t) {
@@ -747,8 +749,10 @@
   $('tabBtnProjects').addEventListener('click', function () { showTab('projects'); });
   $('tabBtnLinks').addEventListener('click', function () { showTab('links'); });
   $('tabBtnDocs').addEventListener('click', function () { showTab('docs'); });
-  $('tabBtnCreds').addEventListener('click', function () { showTab('creds'); });
-  if ($('tabBtnKeys')) $('tabBtnKeys').addEventListener('click', function () { showTab('keys'); });
+  ['keys', 'prompts', 'repos', 'employees'].forEach(function (n) {
+    var b = $('tabBtn' + n.charAt(0).toUpperCase() + n.slice(1));
+    if (b) b.addEventListener('click', function () { showTab(n); });
+  });
   $('tabBtnIdeas').addEventListener('click', function () { showTab('ideas'); });
   $('tabBtnExpenses').addEventListener('click', function () { showTab('expenses'); });
 

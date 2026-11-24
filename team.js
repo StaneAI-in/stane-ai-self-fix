@@ -49,7 +49,8 @@
     boardCount: { todo: $('tmBoardTodoCount'), doing: $('tmBoardDoingCount'), done: $('tmBoardDoneCount') },
     boardEmpty: { todo: $('tmBoardTodoEmpty'), doing: $('tmBoardDoingEmpty'), done: $('tmBoardDoneEmpty') },
     projForm: $('tmProjForm'), projName: $('tmProjName'), projNote: $('tmProjNote'),
-    projList: $('tmProjList'), projEmpty: $('tmProjEmpty'), projCount: $('tmProjCount')
+    projList: $('tmProjList'), projEmpty: $('tmProjEmpty'), projCount: $('tmProjCount'),
+    projView: $('tmProjView'), projHint: $('tmProjHint')
   };
   if (!el.mine) return;
 
@@ -92,7 +93,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -203,7 +204,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -1196,8 +1197,21 @@
     wrap.appendChild(edit);
     return wrap;
   }
+  // Projects has two parts: "list" (name + direct links + details) and "tasks" (tasks under each project).
+  var PROJ_VIEW_KEY = 'stane-proj-view';
+  var projView = 'list';
+  try { if (localStorage.getItem(PROJ_VIEW_KEY) === 'tasks') projView = 'tasks'; } catch (e) { /* default */ }
+  function projectUrl(p) { return safeUrl(p.live) || safeUrl(p.repo); }
   function renderProjects() {
     if (!el.projList) return;
+    var tasksView = projView === 'tasks';
+    if (el.projView) el.projView.querySelectorAll('button').forEach(function (b) {
+      var on = b.dataset.view === projView;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    if (el.projForm) el.projForm.closest('section').hidden = tasksView;
+    el.projList.classList.toggle('proj-tasks-view', tasksView);
     var ids = Object.keys(state.projects).sort(function (a, b) {
       return (state.projects[a].created || 0) - (state.projects[b].created || 0);
     });
@@ -1216,7 +1230,17 @@
       var head = document.createElement('div');
       head.className = 'card-head';
       var h = document.createElement('h2');
-      h.textContent = p.name;
+      var direct = projectUrl(p);
+      if (direct && !tasksView) {
+        var nameLink = document.createElement('a');
+        nameLink.className = 'project-name-link';
+        nameLink.href = direct;
+        nameLink.target = '_blank';
+        nameLink.rel = 'noopener noreferrer';
+        nameLink.textContent = p.name;
+        nameLink.title = 'Open ' + direct;
+        h.appendChild(nameLink);
+      } else h.textContent = p.name;
       if (p.tag) {
         var tag = document.createElement('span');
         tag.className = 'project-tag' + (/desktop/i.test(p.tag) ? ' desktop' : '');
@@ -1236,10 +1260,14 @@
       if (p.by === ROLE || ROLE === 'admin') right.appendChild(delButton('project-del', 'Delete project: ' + p.name));
       head.appendChild(right);
       card.appendChild(head);
-      card.appendChild(detailsBlock(pid, p));
+      if (!tasksView) {
+        card.appendChild(detailsBlock(pid, p));
+        el.projList.appendChild(card);
+        return;
+      }
 
       var sub = document.createElement('h3');
-      sub.textContent = 'New implementations';
+      sub.textContent = 'Tasks';
       card.appendChild(sub);
 
       implIds.sort(function (a, b) {
@@ -1285,14 +1313,14 @@
       } else {
         var empty = document.createElement('p');
         empty.className = 'empty';
-        empty.textContent = 'Nothing added yet.';
+        empty.textContent = 'No tasks yet.';
         card.appendChild(empty);
       }
 
       var form = document.createElement('form');
       form.className = 'add impl-form';
       form.autocomplete = 'off';
-      form.appendChild(draftInput('im:' + pid, 'What new can be added?', 'New implementation for ' + p.name, 300));
+      form.appendChild(draftInput('im:' + pid, 'Add a task for ' + p.name, 'New task for ' + p.name, 300));
       var add = document.createElement('button');
       add.type = 'submit';
       add.textContent = 'Add';
@@ -1308,7 +1336,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderNames();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -1683,6 +1711,495 @@
   }
 
   if (typeof window.STANE_MOVE_PERSONAL_KEYS === 'function') window.STANE_MOVE_PERSONAL_KEYS();
+
+  /* ---------------- Prompts, GitHub repos, Employees (shared, both can edit) ---------------- */
+  // Each is a simple list kept in the team data file: an add/edit form, a search box,
+  // a filter and a list. makeList wires up the parts they have in common.
+  function textOf(v) { return String(v == null ? '' : v); }
+  function pill(text, cls) {
+    var s = document.createElement('span');
+    s.className = 'count-pill' + (cls ? ' ' + cls : '');
+    s.textContent = text;
+    return s;
+  }
+  function miniBtn(cls, text, id, label) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mini-btn ' + cls;
+    b.textContent = text;
+    b.dataset.id = id;
+    if (label) b.setAttribute('aria-label', label);
+    return b;
+  }
+  function byLine(item) {
+    var parts = [];
+    if (item.by) parts.push('Added by ' + nameOf(item.by));
+    if (item.updated) parts.push('Updated ' + shortStamp(item.updated));
+    return parts.join(' · ');
+  }
+  // Fills a filter <select> with "all" plus the groups in use, keeping the current choice.
+  function fillGroupFilter(sel, allText, groups) {
+    if (!sel || document.activeElement === sel) return;
+    var chosen = sel.value;
+    sel.textContent = '';
+    [['', allText]].concat(groups.map(function (g) { return [g, g]; })).forEach(function (p) {
+      var o = document.createElement('option');
+      o.value = p[0];
+      o.textContent = p[1];
+      sel.appendChild(o);
+    });
+    sel.value = groups.indexOf(chosen) !== -1 ? chosen : '';
+  }
+  function fillDatalist(dl, groups) {
+    if (!dl) return;
+    dl.textContent = '';
+    groups.forEach(function (g) { var o = document.createElement('option'); o.value = g; dl.appendChild(o); });
+  }
+
+  // cfg: part, prefix, ids (form, head, save, cancel, msg, list, empty, count, search, filter),
+  // fields { formId: itemKey }, required [itemKey], titles { add, edit(item), save, saveEdit },
+  // read(values, old) -> item or error string, matches(item, q, f), sort(a, b), renderItem(id, item) -> li,
+  // render extra (optional), onClick(btn, id, item) for buttons other than edit/delete.
+  function makeList(cfg) {
+    var f = {};
+    Object.keys(cfg.ids).forEach(function (k) { f[k] = $(cfg.ids[k]); });
+    var inputs = {};
+    Object.keys(cfg.fields).forEach(function (id) { inputs[cfg.fields[id]] = $(id); });
+    var editing = '';
+    var list = { editing: function () { return editing; } };
+
+    function ids() {
+      var q = f.search ? f.search.value.trim().toLowerCase() : '';
+      var fv = f.filter ? f.filter.value : '';
+      return Object.keys(state[cfg.part]).filter(function (id) {
+        return cfg.matches(state[cfg.part][id], q, fv);
+      }).sort(function (a, b) { return cfg.sort(state[cfg.part][a], state[cfg.part][b]); });
+    }
+    list.render = function () {
+      if (!f.list) return;
+      if (cfg.renderExtra) cfg.renderExtra(f);
+      var shown = ids();
+      f.list.textContent = '';
+      shown.forEach(function (id) {
+        var li = cfg.renderItem(id, state[cfg.part][id]);
+        if (id === editing) li.classList.add('editing');
+        f.list.appendChild(li);
+      });
+      var total = Object.keys(state[cfg.part]).length;
+      if (f.count) f.count.textContent = cfg.count ? cfg.count() : total;
+      f.empty.hidden = shown.length > 0;
+      f.empty.textContent = total ? 'Nothing matches this search.' : cfg.emptyText;
+    };
+    function reset() {
+      editing = '';
+      f.form.reset();
+      f.head.textContent = cfg.titles.add;
+      f.save.textContent = cfg.titles.save;
+      f.cancel.hidden = true;
+    }
+    list.edit = function (id) {
+      var item = state[cfg.part][id];
+      if (!item) return;
+      editing = id;
+      Object.keys(inputs).forEach(function (k) { if (inputs[k]) inputs[k].value = textOf(item[k]); });
+      f.head.textContent = cfg.titles.edit(item);
+      f.save.textContent = 'Save changes';
+      f.cancel.hidden = false;
+      setAkMsg(f.msg, '', '');
+      list.render();
+      f.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var first = inputs[cfg.required[0]];
+      if (first) first.focus();
+    };
+    list.remove = function (id) {
+      delete state[cfg.part][id];
+      stamp(cfg.prefix + ':' + id);
+      if (editing === id) reset();
+      save();
+      list.render();
+    };
+    if (!f.form) return list;
+
+    f.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var values = {};
+      Object.keys(inputs).forEach(function (k) { values[k] = inputs[k] ? inputs[k].value.trim() : ''; });
+      var missing = cfg.required.filter(function (k) { return !values[k]; });
+      if (missing.length) { setAkMsg(f.msg, 'Fill in the required fields.', 'error'); return; }
+      var id = editing || newId();
+      var old = state[cfg.part][id];
+      var item = cfg.read(values, old, id);
+      if (typeof item === 'string') { setAkMsg(f.msg, item, 'error'); return; }
+      item.by = old && old.by ? old.by : ROLE;
+      item.created = old ? old.created : Date.now();
+      item.updated = Date.now();
+      state[cfg.part][id] = item;
+      stamp(cfg.prefix + ':' + id);
+      save();
+      var wasEdit = !!editing;
+      reset();
+      list.render();
+      setAkMsg(f.msg, wasEdit ? 'Changes saved.' : 'Saved.', 'ok');
+      if (cfg.afterSave) cfg.afterSave(id);
+    });
+    f.cancel.addEventListener('click', function () { reset(); setAkMsg(f.msg, '', ''); list.render(); });
+    if (f.search) f.search.addEventListener('input', list.render);
+    if (f.filter) f.filter.addEventListener('change', list.render);
+    f.list.addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      var id = btn ? btn.dataset.id : '';
+      if (btn && id && state[cfg.part][id]) {
+        if (btn.classList.contains('row-edit')) { list.edit(id); return; }
+        if (btn.classList.contains('row-del')) { armOrRun(btn, function () { list.remove(id); }); return; }
+      }
+      if (cfg.onClick) cfg.onClick(e, btn);
+    });
+    return list;
+  }
+  function rowActions(id, label) {
+    var actions = document.createElement('div');
+    actions.className = 'ak-actions';
+    actions.appendChild(miniBtn('row-edit', 'Edit', id, 'Edit: ' + label));
+    actions.appendChild(miniBtn('row-del', 'Delete', id, 'Delete: ' + label));
+    return actions;
+  }
+  function groupsOf(part, key) {
+    var g = {};
+    Object.keys(state[part]).forEach(function (id) { var v = textOf(state[part][id][key]).trim(); if (v) g[v] = true; });
+    return Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
+  }
+  function hay(item, keys) { return keys.map(function (k) { return textOf(item[k]); }).join(' ').toLowerCase(); }
+
+  /* ----- Prompts ----- */
+  var prompts = makeList({
+    part: 'prompts', prefix: 'pm', emptyText: 'No prompts saved yet.',
+    ids: { form: 'pmForm', head: 'pmHead', save: 'pmSave', cancel: 'pmCancel', msg: 'pmMsg', list: 'pmList',
+      empty: 'pmEmpty', count: 'pmCount', search: 'pmSearch', filter: 'pmFilter' },
+    fields: { pmTitle: 'title', pmText: 'text', pmGroup: 'group', pmNote: 'note' },
+    required: ['title', 'text'],
+    titles: { add: 'Add a prompt', save: 'Save prompt', edit: function (p) { return 'Edit: ' + p.title; } },
+    read: function (v) { return { title: v.title, text: v.text, group: v.group, note: v.note }; },
+    matches: function (p, q, f) {
+      if (f && textOf(p.group) !== f) return false;
+      return !q || hay(p, ['title', 'text', 'group', 'note']).indexOf(q) !== -1;
+    },
+    sort: function (a, b) { return (b.updated || 0) - (a.updated || 0); },
+    renderExtra: function (f) {
+      var g = groupsOf('prompts', 'group');
+      fillGroupFilter(f.filter, 'All categories', g);
+      fillDatalist($('pmGroupList'), g);
+    },
+    renderItem: function (id, p) {
+      var li = document.createElement('li');
+      li.className = 'board-item pm-item';
+      var top = document.createElement('div');
+      top.className = 'ak-top';
+      var t = document.createElement('strong');
+      t.className = 'cred-title';
+      t.textContent = p.title;
+      top.appendChild(t);
+      if (p.group) top.appendChild(pill(p.group));
+      li.appendChild(top);
+      var body = document.createElement('pre');
+      body.className = 'pm-text' + (pmOpen[id] ? ' open' : '');
+      body.textContent = p.text;
+      li.appendChild(body);
+      if (p.note) {
+        var n = document.createElement('p');
+        n.className = 'ak-note';
+        n.textContent = p.note;
+        li.appendChild(n);
+      }
+      var m = document.createElement('p');
+      m.className = 'ak-meta';
+      m.textContent = byLine(p);
+      li.appendChild(m);
+      var actions = rowActions(id, p.title);
+      actions.insertBefore(miniBtn('pm-more', pmOpen[id] ? 'Show less' : 'Show all', id), actions.firstChild);
+      actions.insertBefore(miniBtn('pm-copy', 'Copy prompt', id, 'Copy prompt: ' + p.title), actions.firstChild);
+      li.appendChild(actions);
+      return li;
+    },
+    onClick: function (e, btn) {
+      if (!btn) return;
+      var p = state.prompts[btn.dataset.id];
+      if (!p) return;
+      if (btn.classList.contains('pm-copy')) {
+        copyText(p.text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+      } else if (btn.classList.contains('pm-more')) {
+        pmOpen[btn.dataset.id] = !pmOpen[btn.dataset.id];
+        prompts.render();
+      }
+    }
+  });
+  var pmOpen = {};
+
+  /* ----- GitHub repos ----- */
+  // "https://github.com/owner/repo(.git)(/…)" or "owner/repo" -> { url, path } (path = "owner/repo").
+  function parseRepo(input) {
+    var s = textOf(input).trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+    var m = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)/i.exec(s) ||
+      /^git@github\.com:([\w.-]+)\/([\w.-]+)$/i.exec(s) ||
+      /^([\w.-]+)\/([\w.-]+)$/.exec(s);
+    if (m) return { url: 'https://github.com/' + m[1] + '/' + m[2], path: m[1] + '/' + m[2] };
+    var u = safeUrl(s);
+    return u ? { url: u, path: '' } : null;
+  }
+  var repos = makeList({
+    part: 'repos', prefix: 'gh', emptyText: 'No repositories saved yet.',
+    ids: { form: 'ghForm', head: 'ghHead', save: 'ghSave', cancel: 'ghCancel', msg: 'ghMsg', list: 'ghList',
+      empty: 'ghEmpty', count: 'ghCount', search: 'ghSearch', filter: 'ghFilter' },
+    fields: { ghUrl: 'url', ghName: 'name', ghNote: 'note', ghGroup: 'group', ghBranch: 'branch', ghVis: 'vis' },
+    required: ['url'],
+    titles: { add: 'Add a repository', save: 'Save repo', edit: function (r) { return 'Edit: ' + r.name; } },
+    read: function (v, old, id) {
+      var r = parseRepo(v.url);
+      if (!r) return 'That does not look like a GitHub link.';
+      var dupe = Object.keys(state.repos).filter(function (x) { return x !== id && state.repos[x].url === r.url; })[0];
+      if (dupe) return 'This repo is already saved as "' + state.repos[dupe].name + '".';
+      return { url: r.url, path: r.path, name: v.name || (r.path ? r.path.split('/')[1] : r.url),
+        note: v.note, group: v.group, branch: v.branch, vis: v.vis === 'public' ? 'public' : 'private' };
+    },
+    matches: function (r, q, f) {
+      if (f && textOf(r.group) !== f) return false;
+      return !q || hay(r, ['name', 'path', 'url', 'note', 'group']).indexOf(q) !== -1;
+    },
+    sort: function (a, b) { return textOf(a.name).localeCompare(textOf(b.name)); },
+    renderExtra: function (f) {
+      var g = groupsOf('repos', 'group');
+      fillGroupFilter(f.filter, 'All projects', g);
+      fillDatalist($('ghGroupList'), g);
+    },
+    renderItem: function (id, r) {
+      var li = document.createElement('li');
+      li.className = 'board-item gh-item';
+      var top = document.createElement('div');
+      top.className = 'ak-top';
+      var a = document.createElement('a');
+      a.className = 'cred-title gh-name';
+      a.href = r.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = r.name;
+      top.appendChild(a);
+      top.appendChild(pill(r.vis === 'public' ? 'Public' : 'Private', 'gh-vis ' + (r.vis === 'public' ? 'public' : 'private')));
+      if (r.group) top.appendChild(pill(r.group));
+      li.appendChild(top);
+      var path = document.createElement('code');
+      path.className = 'cred-val gh-path';
+      path.textContent = (r.path || r.url.replace(/^https?:\/\//, '')) + (r.branch ? ' · ' + r.branch : '');
+      li.appendChild(path);
+      if (r.note) {
+        var n = document.createElement('p');
+        n.className = 'ak-note';
+        n.textContent = r.note;
+        li.appendChild(n);
+      }
+      var m = document.createElement('p');
+      m.className = 'ak-meta';
+      m.textContent = byLine(r);
+      li.appendChild(m);
+      var actions = rowActions(id, r.name);
+      if (r.path) actions.insertBefore(miniBtn('gh-clone', 'Copy git clone', id, 'Copy clone command: ' + r.name), actions.firstChild);
+      actions.insertBefore(miniBtn('gh-copy', 'Copy link', id, 'Copy link: ' + r.name), actions.firstChild);
+      li.appendChild(actions);
+      return li;
+    },
+    onClick: function (e, btn) {
+      if (!btn) return;
+      var r = state.repos[btn.dataset.id];
+      if (!r) return;
+      var text = btn.classList.contains('gh-copy') ? r.url
+        : btn.classList.contains('gh-clone') ? 'git clone ' + r.url + '.git' : '';
+      if (text) copyText(text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+    }
+  });
+
+  /* ----- Employees ----- */
+  var EMP_STATUS = { active: 'Active', leave: 'On leave', left: 'Left' };
+  function empStatusOf(e) { return EMP_STATUS[e.status] ? e.status : 'active'; }
+  function initials(name) {
+    var p = textOf(name).trim().split(/\s+/).filter(Boolean);
+    return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase();
+  }
+  var empOpenId = '', empBox = null;
+  var employees = makeList({
+    part: 'employees', prefix: 'em', emptyText: 'No employees added yet.',
+    ids: { form: 'emForm', head: 'emHead', save: 'emSave', cancel: 'emCancel', msg: 'emMsg', list: 'emList',
+      empty: 'emEmpty', count: 'emCount', search: 'emSearch', filter: 'emFilter' },
+    fields: { emName: 'name', emRole: 'role', emPhone: 'phone', emEmail: 'email', emTeam: 'team', emStatus: 'status',
+      emJoined: 'joined', emSalary: 'salary', emSkills: 'skills', emAddress: 'address', emEmergency: 'emergency', emNote: 'note' },
+    required: ['name', 'role'],
+    titles: { add: 'Add an employee', save: 'Save employee', edit: function (e) { return 'Edit: ' + e.name; } },
+    read: function (v) {
+      var e = {};
+      Object.keys(v).forEach(function (k) { e[k] = v[k]; });
+      e.status = EMP_STATUS[v.status] ? v.status : 'active';
+      return e;
+    },
+    count: function () {
+      return Object.keys(state.employees).filter(function (id) { return empStatusOf(state.employees[id]) === 'active'; }).length;
+    },
+    matches: function (e, q, f) {
+      if (f && empStatusOf(e) !== f) return false;
+      return !q || hay(e, ['name', 'role', 'team', 'skills', 'phone', 'email', 'note']).indexOf(q) !== -1;
+    },
+    sort: function (a, b) {
+      var order = { active: 0, leave: 1, left: 2 };
+      return order[empStatusOf(a)] - order[empStatusOf(b)] || textOf(a.name).localeCompare(textOf(b.name));
+    },
+    renderExtra: function () { fillDatalist($('emTeamList'), groupsOf('employees', 'team')); },
+    renderItem: function (id, e) {
+      var li = document.createElement('li');
+      li.className = 'emp-item ' + empStatusOf(e);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'emp-card';
+      b.dataset.open = id;
+      b.setAttribute('aria-label', 'Show details: ' + e.name);
+      var av = document.createElement('span');
+      av.className = 'emp-avatar';
+      av.textContent = initials(e.name);
+      var txt = document.createElement('span');
+      txt.className = 'emp-txt';
+      var n = document.createElement('strong');
+      n.textContent = e.name;
+      var r = document.createElement('span');
+      r.className = 'emp-role';
+      r.textContent = e.role + (e.team ? ' · ' + e.team : '');
+      txt.appendChild(n);
+      txt.appendChild(r);
+      b.appendChild(av);
+      b.appendChild(txt);
+      b.appendChild(pill(EMP_STATUS[empStatusOf(e)], 'emp-status ' + empStatusOf(e)));
+      li.appendChild(b);
+      return li;
+    },
+    onClick: function (ev) {
+      var card = ev.target.closest('.emp-card');
+      if (card) openEmployee(card.dataset.open);
+    },
+    afterSave: function (id) { openEmployee(id); }
+  });
+
+  function openEmployee(id) {
+    empOpenId = id;
+    renderEmployee();
+  }
+  function closeEmployee() {
+    empOpenId = '';
+    if (empBox) { empBox.hidden = true; empBox.textContent = ''; }
+    document.documentElement.classList.remove('modal-open');
+  }
+  function detailRow(dl, label, value, href) {
+    if (!value) return;
+    var dt = document.createElement('dt');
+    dt.textContent = label;
+    var dd = document.createElement('dd');
+    if (href) {
+      var a = document.createElement('a');
+      a.href = href;
+      a.textContent = value;
+      dd.appendChild(a);
+    } else dd.textContent = value;
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  }
+  function renderEmployee() {
+    var e = empOpenId && state.employees[empOpenId];
+    if (!e) { if (empOpenId) closeEmployee(); return; }
+    var id = empOpenId;
+    if (!empBox) {
+      empBox = document.createElement('div');
+      empBox.className = 'plan-shade';
+      empBox.addEventListener('click', function (ev) {
+        if (ev.target === empBox || ev.target.closest('.emp-close')) { closeEmployee(); return; }
+        var btn = ev.target.closest('button');
+        if (!btn || !state.employees[empOpenId]) return;
+        var cur = empOpenId;
+        if (btn.classList.contains('emp-edit')) { closeEmployee(); employees.edit(cur); }
+        else if (btn.classList.contains('emp-del')) armOrRun(btn, function () { closeEmployee(); employees.remove(cur); });
+        else if (btn.classList.contains('emp-copy')) {
+          copyText(btn.dataset.value).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+        }
+      });
+      document.body.appendChild(empBox);
+    }
+    empBox.textContent = '';
+    empBox.hidden = false;
+    document.documentElement.classList.add('modal-open');
+
+    var card = document.createElement('section');
+    card.className = 'card plan-card emp-detail';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-label', e.name);
+    var top = document.createElement('div');
+    top.className = 'plan-top';
+    var who = document.createElement('div');
+    who.className = 'emp-who';
+    var av = document.createElement('span');
+    av.className = 'emp-avatar big';
+    av.textContent = initials(e.name);
+    var head = document.createElement('div');
+    var h = document.createElement('h2');
+    h.className = 'plan-title';
+    h.textContent = e.name;
+    var role = document.createElement('p');
+    role.className = 'emp-role';
+    role.textContent = e.role + (e.team ? ' · ' + e.team : '');
+    head.appendChild(h);
+    head.appendChild(role);
+    head.appendChild(pill(EMP_STATUS[empStatusOf(e)], 'emp-status ' + empStatusOf(e)));
+    who.appendChild(av);
+    who.appendChild(head);
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'ghost-btn emp-close';
+    close.textContent = 'Close';
+    top.appendChild(who);
+    top.appendChild(close);
+    card.appendChild(top);
+
+    var dl = document.createElement('dl');
+    dl.className = 'emp-dl';
+    detailRow(dl, 'Phone', e.phone, e.phone ? 'tel:' + e.phone.replace(/[^\d+]/g, '') : '');
+    detailRow(dl, 'Email', e.email, e.email ? 'mailto:' + e.email : '');
+    detailRow(dl, 'Joined', e.joined ? shortKey(e.joined) + ' ' + e.joined.slice(0, 4) : '');
+    detailRow(dl, 'Salary', e.salary);
+    detailRow(dl, 'Skills', e.skills);
+    detailRow(dl, 'Address', e.address);
+    detailRow(dl, 'Emergency contact', e.emergency);
+    detailRow(dl, 'Notes', e.note);
+    if (!dl.children.length) {
+      var none = document.createElement('p');
+      none.className = 'empty';
+      none.textContent = 'No other details yet. Use Edit to add phone, email, joining date and more.';
+      card.appendChild(none);
+    } else card.appendChild(dl);
+
+    var meta = document.createElement('p');
+    meta.className = 'ak-meta';
+    meta.textContent = byLine(e);
+    card.appendChild(meta);
+    var actions = document.createElement('div');
+    actions.className = 'ak-actions';
+    if (e.phone) { var cp = miniBtn('emp-copy', 'Copy phone', id); cp.dataset.value = e.phone; actions.appendChild(cp); }
+    if (e.email) { var ce = miniBtn('emp-copy', 'Copy email', id); ce.dataset.value = e.email; actions.appendChild(ce); }
+    actions.appendChild(miniBtn('emp-edit', 'Edit', id, 'Edit: ' + e.name));
+    actions.appendChild(miniBtn('emp-del', 'Delete', id, 'Delete: ' + e.name));
+    card.appendChild(actions);
+    empBox.appendChild(card);
+    close.focus();
+  }
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && empOpenId) closeEmployee(); });
+
+  function renderCollections() {
+    prompts.render();
+    repos.render();
+    employees.render();
+    if (empOpenId) renderEmployee();
+  }
 
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
@@ -2144,6 +2661,16 @@
   });
 
   /* ---------------- events: projects ---------------- */
+  if (el.projView) {
+    el.projView.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-view]');
+      if (!b) return;
+      projView = b.dataset.view === 'tasks' ? 'tasks' : 'list';
+      try { localStorage.setItem(PROJ_VIEW_KEY, projView); } catch (err) { /* this visit only */ }
+      if (el.projHint) el.projHint.hidden = projView === 'tasks';
+      renderProjects();
+    });
+  }
   if (el.projForm) {
     el.projForm.addEventListener('submit', function (e) {
       e.preventDefault();

@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=27">
-  <script src="team-key.js?v=27"></script>
-  <script src="auth.js?v=27"></script>
+  <link rel="stylesheet" href="style.css?v=28">
+  <script src="team-key.js?v=28"></script>
+  <script src="auth.js?v=28"></script>
 </head>
 <body data-role="member">
   <header class="top">
@@ -29,8 +29,10 @@
     <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
     <button type="button" role="tab" data-tab="tabLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
     <button type="button" role="tab" data-tab="tabDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Documents</button>
-    <button type="button" role="tab" data-tab="tabCreds" aria-controls="tabCreds" aria-selected="false" class="tab">App credentials</button>
     <button type="button" role="tab" data-tab="tabKeys" aria-controls="tabKeys" aria-selected="false" class="tab">API keys</button>
+    <button type="button" role="tab" data-tab="tabPrompts" aria-controls="tabPrompts" aria-selected="false" class="tab">Prompts</button>
+    <button type="button" role="tab" data-tab="tabRepos" aria-controls="tabRepos" aria-selected="false" class="tab">GitHub</button>
+    <button type="button" role="tab" data-tab="tabEmployees" aria-controls="tabEmployees" aria-selected="false" class="tab">Employees</button>
     <button type="button" role="tab" data-tab="tabIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <span class="sync-chip off" id="tmChip">Not connected</span>
@@ -135,12 +137,16 @@
 
   <!-- ===================== Projects ===================== -->
   <main class="ideas-wrap" id="tabProjects" role="tabpanel" hidden>
+    <div class="idea-filter" id="tmProjView" role="group" aria-label="Show">
+      <button type="button" data-view="list" class="active" aria-pressed="true">Projects</button>
+      <button type="button" data-view="tasks" aria-pressed="false">Project tasks</button>
+    </div>
     <section class="card board-add" aria-label="Add a project">
       <div class="card-head">
         <h2>Projects</h2>
         <span class="count-pill"><strong id="tmProjCount">0</strong> projects</span>
       </div>
-      <p class="hint">Add what new can be implemented in each project. Both of you can add ideas and change their status.</p>
+      <p class="hint" id="tmProjHint">Every project with its direct link. Open "Project tasks" to see and add tasks under each project.</p>
       <form id="tmProjForm" class="add board-form" autocomplete="off">
         <input type="text" id="tmProjName" maxlength="80" placeholder="New project name" aria-label="New project name" required>
         <input type="text" id="tmProjNote" maxlength="1000" placeholder="Description (optional)" aria-label="Description (optional)">
@@ -202,68 +208,6 @@
       </div>
       <ul class="board-list doc-list" id="tmDocList"></ul>
       <p class="empty" id="tmDocEmpty">No documents yet.</p>
-    </section>
-  </main>
-
-  <!-- ===================== App credentials (encrypted vault) ===================== -->
-  <main class="layout creds-layout" id="tabCreds" role="tabpanel" hidden>
-    <div class="col">
-      <section class="card" aria-label="Vault">
-        <div class="card-head">
-          <h2>App credentials</h2>
-          <span class="count-pill vault-chip shut" id="tmVaultState">Locked</span>
-        </div>
-        <p class="hint" id="tmVaultHint"></p>
-        <form id="tmVaultForm" class="video-form" autocomplete="off">
-          <label>Vault password
-            <input type="password" id="tmVaultPass" autocomplete="off" spellcheck="false" required>
-          </label>
-          <label id="tmVaultPass2Wrap" hidden>Repeat the password
-            <input type="password" id="tmVaultPass2" autocomplete="off" spellcheck="false">
-          </label>
-          <div class="form-row">
-            <button type="submit" class="primary-btn" id="tmVaultBtn">Unlock</button>
-            <span class="form-msg" id="tmVaultMsg" role="status"></span>
-          </div>
-        </form>
-        <div class="form-row" id="tmVaultLockRow" hidden>
-          <button type="button" class="ghost-btn" id="tmVaultLock">Lock now</button>
-        </div>
-      </section>
-
-      <section class="card" id="tmCredAddCard" aria-label="Add a credential" hidden>
-        <h2>Add a credential</h2>
-        <form id="tmCredForm" class="video-form" autocomplete="off">
-          <label>Project
-            <select id="tmCredProject"></select>
-          </label>
-          <label>What is it
-            <input type="text" id="tmCredTitle" maxlength="80" placeholder="e.g. Play Console, Firebase, Keystore" required>
-          </label>
-          <label>Username / email (optional)
-            <input type="text" id="tmCredLogin" maxlength="200" autocomplete="off" spellcheck="false">
-          </label>
-          <label>Password / key
-            <input type="password" id="tmCredSecret" maxlength="4000" autocomplete="new-password" spellcheck="false" required>
-          </label>
-          <label>Notes (optional)
-            <textarea id="tmCredNote" rows="2" maxlength="1000" placeholder="Where it is used, expiry date…"></textarea>
-          </label>
-          <div class="form-row">
-            <button type="submit" class="primary-btn">Save encrypted</button>
-            <span class="form-msg" id="tmCredMsg" role="status"></span>
-          </div>
-        </form>
-      </section>
-    </div>
-
-    <section class="card" aria-label="Saved credentials">
-      <div class="card-head">
-        <h2>Saved</h2>
-        <span class="count-pill"><strong id="tmCredCount">0</strong> saved</span>
-      </div>
-      <div id="tmCredList"></div>
-      <p class="empty" id="tmCredEmpty">No credentials saved yet.</p>
     </section>
   </main>
 
@@ -353,6 +297,177 @@
       <p class="form-msg" id="akToolMsg" role="status"></p>
       <ul class="board-list ak-list" id="akList"></ul>
       <p class="empty" id="akEmpty">No API keys saved yet.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Prompts (shared) ===================== -->
+  <main class="layout split-layout" id="tabPrompts" role="tabpanel" hidden>
+    <section class="card" aria-label="Add a prompt">
+      <h2 id="pmHead">Add a prompt</h2>
+      <p class="hint">Important prompts, shared by both of you.</p>
+      <form id="pmForm" class="video-form" autocomplete="off">
+        <label>Title
+          <input type="text" id="pmTitle" maxlength="120" placeholder="e.g. App store description writer" required>
+        </label>
+        <label>Prompt
+          <textarea id="pmText" rows="8" maxlength="20000" required></textarea>
+        </label>
+        <label>Category (optional)
+          <input type="text" id="pmGroup" maxlength="60" placeholder="Coding, Marketing, Design…" list="pmGroupList">
+        </label>
+        <datalist id="pmGroupList"></datalist>
+        <label>Notes (optional)
+          <textarea id="pmNote" rows="2" maxlength="1000" placeholder="Which model works best, when to use it…"></textarea>
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="pmSave">Save prompt</button>
+          <button type="button" class="ghost-btn" id="pmCancel" hidden>Cancel edit</button>
+          <span class="form-msg" id="pmMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <section class="card" aria-label="Saved prompts">
+      <div class="card-head">
+        <h2>Saved prompts</h2>
+        <span class="count-pill"><strong id="pmCount">0</strong> saved</span>
+      </div>
+      <div class="ak-tools">
+        <input type="search" id="pmSearch" placeholder="Search prompts…" aria-label="Search prompts">
+        <select id="pmFilter" aria-label="Filter by category"></select>
+      </div>
+      <ul class="board-list" id="pmList"></ul>
+      <p class="empty" id="pmEmpty">No prompts saved yet.</p>
+    </section>
+  </main>
+
+  <!-- ===================== GitHub repos (shared) ===================== -->
+  <main class="layout split-layout" id="tabRepos" role="tabpanel" hidden>
+    <section class="card" aria-label="Add a repository">
+      <h2 id="ghHead">Add a repository</h2>
+      <p class="hint">Important GitHub repos, shared by both of you.</p>
+      <form id="ghForm" class="video-form" autocomplete="off">
+        <label>Repository link
+          <input type="text" id="ghUrl" maxlength="300" placeholder="https://github.com/owner/repo" required spellcheck="false">
+        </label>
+        <label>Name (optional)
+          <input type="text" id="ghName" maxlength="100" placeholder="Taken from the link if left empty">
+        </label>
+        <label>What it is (optional)
+          <textarea id="ghNote" rows="2" maxlength="1000" placeholder="What this repo is for…"></textarea>
+        </label>
+        <div class="idea-opts">
+          <label>Project (optional)
+            <input type="text" id="ghGroup" maxlength="60" placeholder="App or project" list="ghGroupList">
+          </label>
+          <label>Main branch (optional)
+            <input type="text" id="ghBranch" maxlength="60" placeholder="main" spellcheck="false">
+          </label>
+          <label>Visibility
+            <select id="ghVis">
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+          </label>
+        </div>
+        <datalist id="ghGroupList"></datalist>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="ghSave">Save repo</button>
+          <button type="button" class="ghost-btn" id="ghCancel" hidden>Cancel edit</button>
+          <span class="form-msg" id="ghMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <section class="card" aria-label="Saved repositories">
+      <div class="card-head">
+        <h2>Repositories</h2>
+        <span class="count-pill"><strong id="ghCount">0</strong> saved</span>
+      </div>
+      <div class="ak-tools">
+        <input type="search" id="ghSearch" placeholder="Search repos…" aria-label="Search repositories">
+        <select id="ghFilter" aria-label="Filter by project"></select>
+      </div>
+      <ul class="board-list" id="ghList"></ul>
+      <p class="empty" id="ghEmpty">No repositories saved yet.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Employees (shared) ===================== -->
+  <main class="layout split-layout" id="tabEmployees" role="tabpanel" hidden>
+    <section class="card" aria-label="Add an employee">
+      <h2 id="emHead">Add an employee</h2>
+      <form id="emForm" class="video-form" autocomplete="off">
+        <div class="idea-opts">
+          <label>Full name
+            <input type="text" id="emName" maxlength="100" required>
+          </label>
+          <label>Role
+            <input type="text" id="emRole" maxlength="80" placeholder="e.g. Flutter developer" required>
+          </label>
+        </div>
+        <div class="idea-opts">
+          <label>Phone (optional)
+            <input type="tel" id="emPhone" maxlength="30">
+          </label>
+          <label>Email (optional)
+            <input type="email" id="emEmail" maxlength="120">
+          </label>
+        </div>
+        <div class="idea-opts">
+          <label>Team (optional)
+            <input type="text" id="emTeam" maxlength="60" placeholder="Tech, Design, Sales…" list="emTeamList">
+          </label>
+          <label>Status
+            <select id="emStatus">
+              <option value="active">Active</option>
+              <option value="leave">On leave</option>
+              <option value="left">Left</option>
+            </select>
+          </label>
+        </div>
+        <datalist id="emTeamList"></datalist>
+        <div class="idea-opts">
+          <label>Joining date (optional)
+            <input type="date" id="emJoined">
+          </label>
+          <label>Salary (optional)
+            <input type="text" id="emSalary" maxlength="40" placeholder="e.g. ₹25,000 / month">
+          </label>
+        </div>
+        <label>Skills (optional)
+          <input type="text" id="emSkills" maxlength="300" placeholder="Flutter, Firebase, Figma…">
+        </label>
+        <label>Address (optional)
+          <textarea id="emAddress" rows="2" maxlength="500"></textarea>
+        </label>
+        <label>Emergency contact (optional)
+          <input type="text" id="emEmergency" maxlength="120" placeholder="Name and phone">
+        </label>
+        <label>Notes (optional)
+          <textarea id="emNote" rows="3" maxlength="2000" placeholder="Work done, documents received, anything else…"></textarea>
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="emSave">Save employee</button>
+          <button type="button" class="ghost-btn" id="emCancel" hidden>Cancel edit</button>
+          <span class="form-msg" id="emMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <section class="card" aria-label="Employees">
+      <div class="card-head">
+        <h2>Employees</h2>
+        <span class="count-pill"><strong id="emCount">0</strong> active</span>
+      </div>
+      <div class="ak-tools">
+        <input type="search" id="emSearch" placeholder="Search name, role, skills…" aria-label="Search employees">
+        <select id="emFilter" aria-label="Filter by status">
+          <option value="">Everyone</option>
+          <option value="active">Active</option>
+          <option value="leave">On leave</option>
+          <option value="left">Left</option>
+        </select>
+      </div>
+      <ul class="emp-grid" id="emList"></ul>
+      <p class="empty" id="emEmpty">No employees added yet.</p>
     </section>
   </main>
 
@@ -468,6 +583,6 @@
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
     })();
   </script>
-  <script src="team.js?v=27"></script>
+  <script src="team.js?v=28"></script>
 </body>
 </html>
