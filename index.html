@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="theme-color" content="#030508">
-  <link rel="stylesheet" href="style.css?v=29">
-  <script src="team-key.js?v=29"></script>
-  <script src="auth.js?v=29"></script>
+  <link rel="stylesheet" href="style.css?v=30">
+  <script src="team-key.js?v=30"></script>
+  <script src="auth.js?v=30"></script>
 </head>
 <body>
   <header class="top">
@@ -29,9 +29,7 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="true" class="tab active">Calendar</button>
-    <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab">English</button>
-    <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="false" class="tab">Assigned</button>
+    <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" id="tabBtnBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" id="tabBtnProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
     <button type="button" role="tab" id="tabBtnLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
@@ -45,12 +43,14 @@
     <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
     <span class="sync-chip off" id="syncChip">Sync off</span>
+    <button type="button" role="tab" id="tabBtnCalendar" aria-controls="tabCalendar" aria-selected="false" class="tab tab-mini">Calendar</button>
+    <button type="button" role="tab" id="tabBtnEnglish" aria-controls="tabEnglish" aria-selected="false" class="tab tab-mini">English</button>
   </nav>
 
   <p class="notice" id="notice" hidden></p>
 
   <!-- ===================== Calendar tab ===================== -->
-  <main class="layout" id="tabCalendar" role="tabpanel" aria-labelledby="tabBtnCalendar">
+  <main class="layout" id="tabCalendar" role="tabpanel" aria-labelledby="tabBtnCalendar" hidden>
     <section class="card calendar" aria-label="Calendar">
       <div class="cal-head">
         <button type="button" class="nav" id="prev" aria-label="Previous month">&#8249;</button>
@@ -133,7 +133,7 @@
   </main>
 
   <!-- ===================== Team tab (admin) ===================== -->
-  <main class="layout" id="tabTeam" role="tabpanel" aria-labelledby="tabBtnTeam" hidden>
+  <main class="layout" id="tabTeam" role="tabpanel" aria-labelledby="tabBtnTeam">
     <div class="col">
       <section class="card" aria-label="Tasks assigned to you">
         <div class="card-head">
@@ -796,7 +796,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=29"></script>
-  <script src="team.js?v=29"></script>
+  <script src="app.js?v=30"></script>
+  <script src="team.js?v=30"></script>
 </body>
 </html>
