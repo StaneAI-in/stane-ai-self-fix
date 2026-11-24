@@ -1327,7 +1327,8 @@
     project: $('akProject'), projectList: $('akProjectList'), link: $('akLink'), limit: $('akLimit'),
     expiry: $('akExpiry'), note: $('akNote'), save: $('akSave'), cancel: $('akCancel'), msg: $('akMsg'),
     count: $('akCount'), search: $('akSearch'), filter: $('akFilter'), mask: $('akMask'),
-    copyEnv: $('akCopyEnv'), toolMsg: $('akToolMsg'), list: $('akList'), empty: $('akEmpty')
+    copyEnv: $('akCopyEnv'), toolMsg: $('akToolMsg'), list: $('akList'), empty: $('akEmpty'),
+    owner: $('akOwner'), bulkOwner: $('akBulkOwner'), ownerFilter: $('akOwnerFilter')
   };
   var akEditing = '';
   var akMasked = false;
@@ -1392,10 +1393,12 @@
   function visibleKeyIds() {
     var q = ak.search ? ak.search.value.trim().toLowerCase() : '';
     var f = ak.filter ? ak.filter.value : '';
+    var who = ak.ownerFilter ? ak.ownerFilter.value : '';
     return Object.keys(state.apiKeys).filter(function (id) {
       var k = state.apiKeys[id];
       if (f === '__none') { if (k.project) return false; }
       else if (f && k.project !== f) return false;
+      if (who && ownerOf(k) !== who) return false;
       if (!q) return true;
       return [k.name, k.project, k.note, k.env, k.limit].join(' ').toLowerCase().indexOf(q) !== -1;
     }).sort(function (a, b) {
@@ -1458,6 +1461,10 @@
       title.className = 'cred-title';
       title.textContent = k.name;
       top.appendChild(title);
+      var own = document.createElement('span');
+      own.className = 'count-pill ak-owner ' + ownerOf(k);
+      own.textContent = nameOf(ownerOf(k)) + "'s key";
+      top.appendChild(own);
       if (k.project) {
         var tag = document.createElement('span');
         tag.className = 'count-pill';
@@ -1532,6 +1539,7 @@
       have[r.key] = true;
       var id = newId() + i;
       state.apiKeys[id] = {
+        owner: r.owner === 'member' || r.owner === 'admin' ? r.owner : ownerOf(r),
         name: r.name, key: r.key, env: r.env || '', project: r.project || '', link: r.link || '',
         limit: r.limit || '', expiry: r.expiry || '', note: r.note || '',
         by: r.by || ROLE, created: r.created || now + i, updated: now
@@ -1545,9 +1553,26 @@
   }
   window.STANE_TEAM_ADD_KEYS = function (rows) { addKeys(rows); };
 
+  // Whose key it is. Keys saved before this existed belong to whoever added them.
+  function ownerOf(k) { return k.owner === 'member' || k.owner === 'admin' ? k.owner : k.by === 'member' ? 'member' : 'admin'; }
+  // Owner choices show the current names and start on the person signed in.
+  function fillOwnerSelects() {
+    [ak.owner, ak.bulkOwner].forEach(function (sel) {
+      if (!sel) return;
+      sel.options[0].textContent = nameOf('admin') + (ROLE === 'admin' ? ' (you)' : '');
+      sel.options[1].textContent = nameOf('member') + (ROLE === 'member' ? ' (you)' : '');
+      if (!akEditing || sel !== ak.owner) sel.value = ROLE;
+    });
+    if (ak.ownerFilter) {
+      ak.ownerFilter.options[1].textContent = nameOf('admin') + "'s keys";
+      ak.ownerFilter.options[2].textContent = nameOf('member') + "'s keys";
+    }
+  }
+
   function resetKeyForm() {
     akEditing = '';
     ak.form.reset();
+    fillOwnerSelects();
     ak.head.textContent = 'Add an API key';
     ak.save.textContent = 'Save key';
     ak.cancel.hidden = true;
@@ -1561,6 +1586,7 @@
     ak.key.value = k.key || '';
     ak.env.value = k.env || '';
     ak.project.value = k.project || '';
+    if (ak.owner) ak.owner.value = ownerOf(k);
     ak.link.value = k.link || '';
     ak.limit.value = k.limit || '';
     ak.expiry.value = k.expiry || '';
@@ -1589,6 +1615,7 @@
       var id = akEditing || newId();
       var old = state.apiKeys[id];
       state.apiKeys[id] = {
+        owner: ak.owner && ak.owner.value === 'member' ? 'member' : 'admin',
         name: name, key: key, env: env, project: ak.project.value.trim(), link: link,
         limit: ak.limit.value.trim(), expiry: ak.expiry.value || '', note: ak.note.value.trim(),
         by: old && old.by ? old.by : ROLE, created: old ? old.created : Date.now(), updated: Date.now()
@@ -1606,6 +1633,8 @@
         e.preventDefault();
         var rows = parseKeyLines(bulkText.value);
         if (!rows.length) { setAkMsg(bulkMsg, 'No "name = key" lines found.', 'error'); return; }
+        var bulkWho = ak.bulkOwner && ak.bulkOwner.value === 'member' ? 'member' : 'admin';
+        rows.forEach(function (r) { r.owner = bulkWho; });
         var res = addKeys(rows);
         var added = res.added, skipped = res.skipped;
         if (added) bulkText.value = '';
@@ -1616,6 +1645,8 @@
     ak.cancel.addEventListener('click', function () { resetKeyForm(); setAkMsg(ak.msg, '', ''); renderKeys(); });
     ak.search.addEventListener('input', renderKeys);
     ak.filter.addEventListener('change', renderKeys);
+    if (ak.ownerFilter) ak.ownerFilter.addEventListener('change', renderKeys);
+    fillOwnerSelects();
     ak.mask.addEventListener('click', function () {
       akMasked = !akMasked;
       try { localStorage.setItem(MASK_KEY, akMasked ? '1' : '0'); } catch (err) { /* this visit only */ }

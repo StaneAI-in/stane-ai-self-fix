@@ -927,3 +927,5 @@ html.modal-open { overflow: hidden; }
 .ak-bulk summary { cursor: pointer; font-weight: 600; color: var(--accent); font-size: 0.9rem; }
 .ak-bulk form { margin-top: 10px; }
 .ak-bulk textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
+.ak-owner { font-weight: 600; color: var(--text); }
+.ak-owner.member { border-color: var(--accent); }
