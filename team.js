@@ -92,7 +92,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -203,7 +203,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -1308,7 +1308,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderNames();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderNames();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -1318,6 +1318,340 @@
       }
     }
   }
+
+  /* ---------------- API keys (shared, plain text) ---------------- */
+  // Free API keys kept in the open, shared by both people through the team data file.
+  var MASK_KEY = 'stane-apikeys-mask';
+  var ak = {
+    form: $('akForm'), head: $('akFormHead'), name: $('akName'), key: $('akKey'), env: $('akEnv'),
+    project: $('akProject'), projectList: $('akProjectList'), link: $('akLink'), limit: $('akLimit'),
+    expiry: $('akExpiry'), note: $('akNote'), save: $('akSave'), cancel: $('akCancel'), msg: $('akMsg'),
+    count: $('akCount'), search: $('akSearch'), filter: $('akFilter'), mask: $('akMask'),
+    copyEnv: $('akCopyEnv'), toolMsg: $('akToolMsg'), list: $('akList'), empty: $('akEmpty')
+  };
+  var akEditing = '';
+  var akMasked = false;
+  try { akMasked = localStorage.getItem(MASK_KEY) === '1'; } catch (e) { akMasked = false; }
+
+  // "Google Maps" -> "GOOGLE_MAPS_API_KEY"
+  function envNameOf(k) {
+    if (k.env) return k.env;
+    var base = String(k.name || 'KEY').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'KEY';
+    if (/^[0-9]/.test(base)) base = '_' + base;
+    if (/_KEY$/.test(base)) return base;
+    return /(^|_)API$/.test(base) ? base + '_KEY' : base + '_API_KEY';
+  }
+  // "groq = gsk_…" or "Groq: gsk_…" per line -> [{ name: 'Groq', key: 'gsk_…' }]
+  function parseKeyLines(text) {
+    var out = [];
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      var m = /^\s*([^=:]+?)\s*[=:]\s*(\S.*?)\s*$/.exec(line);
+      if (!m) return;
+      var name = m[1].replace(/\s+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      out.push({ name: name.slice(0, 80), key: m[2].slice(0, 4000) });
+    });
+    return out;
+  }
+  function maskKey(v) {
+    v = String(v || '');
+    return v.length <= 8 ? '••••••••' : v.slice(0, 4) + '••••••••' + v.slice(-4);
+  }
+  function akDate(key) { var p = key.split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
+  // Whole days from today to an expiry date (negative once it has passed).
+  function daysUntil(dateKey) {
+    return Math.round((akDate(dateKey) - akDate(todayKey())) / 86400000);
+  }
+  function setAkMsg(node, text, kind) {
+    if (!node) return;
+    node.textContent = text;
+    node.className = 'form-msg' + (kind ? ' ' + kind : '');
+  }
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var t = document.createElement('textarea');
+      t.value = text;
+      t.setAttribute('readonly', '');
+      t.style.position = 'fixed';
+      t.style.opacity = '0';
+      document.body.appendChild(t);
+      t.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(t);
+      if (ok) resolve(); else reject(new Error('copy failed'));
+    });
+  }
+  function flash(btn, text) {
+    var original = btn.dataset.label || btn.textContent;
+    btn.dataset.label = original;
+    btn.textContent = text;
+    setTimeout(function () { if (btn.isConnected) btn.textContent = original; }, 1500);
+  }
+
+  function visibleKeyIds() {
+    var q = ak.search ? ak.search.value.trim().toLowerCase() : '';
+    var f = ak.filter ? ak.filter.value : '';
+    return Object.keys(state.apiKeys).filter(function (id) {
+      var k = state.apiKeys[id];
+      if (f === '__none') { if (k.project) return false; }
+      else if (f && k.project !== f) return false;
+      if (!q) return true;
+      return [k.name, k.project, k.note, k.env, k.limit].join(' ').toLowerCase().indexOf(q) !== -1;
+    }).sort(function (a, b) {
+      return String(state.apiKeys[a].name).localeCompare(String(state.apiKeys[b].name)) ||
+        (state.apiKeys[a].created || 0) - (state.apiKeys[b].created || 0);
+    });
+  }
+
+  function akButton(cls, text, id, label) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mini-btn ' + cls;
+    b.textContent = text;
+    b.dataset.id = id;
+    if (label) b.setAttribute('aria-label', label);
+    return b;
+  }
+
+  function renderKeys() {
+    if (!ak.list) return;
+    var all = Object.keys(state.apiKeys);
+    ak.count.textContent = all.length;
+    ak.mask.textContent = akMasked ? 'Show keys' : 'Hide keys';
+    ak.mask.setAttribute('aria-pressed', String(akMasked));
+
+    // Project choices for the filter and the form's suggestions.
+    var projects = {};
+    all.forEach(function (id) { if (state.apiKeys[id].project) projects[state.apiKeys[id].project] = true; });
+    var names = Object.keys(projects).sort(function (a, b) { return a.localeCompare(b); });
+    if (document.activeElement !== ak.filter) {
+      var chosen = ak.filter.value;
+      ak.filter.textContent = '';
+      [['', 'All projects']].concat(names.map(function (n) { return [n, n]; }), [['__none', 'No project']])
+        .forEach(function (p) {
+          var o = document.createElement('option');
+          o.value = p[0];
+          o.textContent = p[1];
+          ak.filter.appendChild(o);
+        });
+      ak.filter.value = chosen && (chosen === '__none' || projects[chosen]) ? chosen : '';
+    }
+    ak.projectList.textContent = '';
+    names.forEach(function (n) { var o = document.createElement('option'); o.value = n; ak.projectList.appendChild(o); });
+
+    var ids = visibleKeyIds();
+    ak.list.textContent = '';
+    ak.empty.hidden = ids.length > 0;
+    ak.empty.textContent = all.length ? 'No keys match this search.' : 'No API keys saved yet.';
+    ak.copyEnv.disabled = ids.length === 0;
+
+    ids.forEach(function (id) {
+      var k = state.apiKeys[id];
+      var li = document.createElement('li');
+      li.className = 'board-item ak-item' + (id === akEditing ? ' editing' : '');
+      li.dataset.id = id;
+
+      var top = document.createElement('div');
+      top.className = 'ak-top';
+      var title = document.createElement('strong');
+      title.className = 'cred-title';
+      title.textContent = k.name;
+      top.appendChild(title);
+      if (k.project) {
+        var tag = document.createElement('span');
+        tag.className = 'count-pill';
+        tag.textContent = k.project;
+        top.appendChild(tag);
+      }
+      if (k.expiry) {
+        var left = daysUntil(k.expiry);
+        if (left <= 30) {
+          var exp = document.createElement('span');
+          exp.className = 'count-pill ak-expiry' + (left < 0 ? ' gone' : ' soon');
+          exp.textContent = left < 0 ? 'Expired' : left === 0 ? 'Expires today' : 'Expires in ' + left + ' day' + (left === 1 ? '' : 's');
+          top.appendChild(exp);
+        }
+      }
+      li.appendChild(top);
+
+      var row = document.createElement('div');
+      row.className = 'cred-line';
+      var val = document.createElement('code');
+      val.className = 'cred-val ak-val';
+      val.textContent = akMasked ? maskKey(k.key) : k.key;
+      row.appendChild(val);
+      row.appendChild(akButton('ak-copy', 'Copy', id, 'Copy key: ' + k.name));
+      row.appendChild(akButton('ak-copy-env', 'Copy .env', id, 'Copy as env line: ' + k.name));
+      li.appendChild(row);
+
+      var meta = [envNameOf(k)];
+      if (k.limit) meta.push('Free limit: ' + k.limit);
+      if (k.expiry) meta.push('Expires ' + shortKey(k.expiry) + ' ' + k.expiry.slice(0, 4));
+      if (k.by) meta.push('Added by ' + nameOf(k.by));
+      if (k.updated) meta.push('Updated ' + shortStamp(k.updated));
+      var m = document.createElement('p');
+      m.className = 'ak-meta';
+      m.textContent = meta.join(' · ');
+      li.appendChild(m);
+
+      if (k.note) {
+        var n = document.createElement('p');
+        n.className = 'ak-note';
+        n.textContent = k.note;
+        li.appendChild(n);
+      }
+
+      var actions = document.createElement('div');
+      actions.className = 'ak-actions';
+      if (k.link && /^https?:\/\//i.test(k.link)) {
+        var a = document.createElement('a');
+        a.className = 'mini-btn';
+        a.href = k.link;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = 'Open dashboard';
+        actions.appendChild(a);
+      }
+      actions.appendChild(akButton('ak-edit', 'Edit', id, 'Edit: ' + k.name));
+      actions.appendChild(akButton('ak-del', 'Delete', id, 'Delete: ' + k.name));
+      li.appendChild(actions);
+
+      ak.list.appendChild(li);
+    });
+  }
+
+  // Adds keys, skipping any whose value is already saved. Used by "Paste many" and by the
+  // one-time move of keys that were saved in Divyanshu's personal data before sharing.
+  function addKeys(rows) {
+    var have = {}, added = 0, skipped = 0, now = Date.now();
+    Object.keys(state.apiKeys).forEach(function (id) { have[state.apiKeys[id].key] = true; });
+    rows.forEach(function (r, i) {
+      if (!r || !r.key || !r.name) return;
+      if (have[r.key]) { skipped++; return; }
+      have[r.key] = true;
+      var id = newId() + i;
+      state.apiKeys[id] = {
+        name: r.name, key: r.key, env: r.env || '', project: r.project || '', link: r.link || '',
+        limit: r.limit || '', expiry: r.expiry || '', note: r.note || '',
+        by: r.by || ROLE, created: r.created || now + i, updated: now
+      };
+      stamp('ak:' + id);
+      added++;
+    });
+    if (added) save();
+    renderKeys();
+    return { added: added, skipped: skipped };
+  }
+  window.STANE_TEAM_ADD_KEYS = function (rows) { addKeys(rows); };
+
+  function resetKeyForm() {
+    akEditing = '';
+    ak.form.reset();
+    ak.head.textContent = 'Add an API key';
+    ak.save.textContent = 'Save key';
+    ak.cancel.hidden = true;
+  }
+
+  function startKeyEdit(id) {
+    var k = state.apiKeys[id];
+    if (!k) return;
+    akEditing = id;
+    ak.name.value = k.name || '';
+    ak.key.value = k.key || '';
+    ak.env.value = k.env || '';
+    ak.project.value = k.project || '';
+    ak.link.value = k.link || '';
+    ak.limit.value = k.limit || '';
+    ak.expiry.value = k.expiry || '';
+    ak.note.value = k.note || '';
+    ak.head.textContent = 'Edit: ' + k.name;
+    ak.save.textContent = 'Save changes';
+    ak.cancel.hidden = false;
+    setAkMsg(ak.msg, '', '');
+    renderKeys();
+    ak.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    ak.name.focus();
+  }
+
+  if (ak.form) {
+    ak.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = ak.name.value.trim(), key = ak.key.value.trim();
+      if (!name || !key) { setAkMsg(ak.msg, 'Add a name and the key.', 'error'); return; }
+      var link = ak.link.value.trim();
+      if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+      var env = ak.env.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      var dupe = Object.keys(state.apiKeys).filter(function (id) {
+        return id !== akEditing && state.apiKeys[id].key === key;
+      })[0];
+      if (dupe) { setAkMsg(ak.msg, 'This key is already saved as "' + state.apiKeys[dupe].name + '".', 'error'); return; }
+      var id = akEditing || newId();
+      var old = state.apiKeys[id];
+      state.apiKeys[id] = {
+        name: name, key: key, env: env, project: ak.project.value.trim(), link: link,
+        limit: ak.limit.value.trim(), expiry: ak.expiry.value || '', note: ak.note.value.trim(),
+        by: old && old.by ? old.by : ROLE, created: old ? old.created : Date.now(), updated: Date.now()
+      };
+      stamp('ak:' + id);
+      save();
+      var wasEdit = !!akEditing;
+      resetKeyForm();
+      renderKeys();
+      setAkMsg(ak.msg, wasEdit ? 'Changes saved.' : 'Key saved.', 'ok');
+    });
+    var bulkForm = $('akBulkForm'), bulkText = $('akBulkText'), bulkMsg = $('akBulkMsg');
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var rows = parseKeyLines(bulkText.value);
+        if (!rows.length) { setAkMsg(bulkMsg, 'No "name = key" lines found.', 'error'); return; }
+        var res = addKeys(rows);
+        var added = res.added, skipped = res.skipped;
+        if (added) bulkText.value = '';
+        setAkMsg(bulkMsg, 'Added ' + added + ' key' + (added === 1 ? '' : 's') +
+          (skipped ? ', skipped ' + skipped + ' already saved' : '') + '.', added ? 'ok' : 'error');
+      });
+    }
+    ak.cancel.addEventListener('click', function () { resetKeyForm(); setAkMsg(ak.msg, '', ''); renderKeys(); });
+    ak.search.addEventListener('input', renderKeys);
+    ak.filter.addEventListener('change', renderKeys);
+    ak.mask.addEventListener('click', function () {
+      akMasked = !akMasked;
+      try { localStorage.setItem(MASK_KEY, akMasked ? '1' : '0'); } catch (err) { /* this visit only */ }
+      renderKeys();
+    });
+    ak.copyEnv.addEventListener('click', function () {
+      var ids = visibleKeyIds();
+      if (!ids.length) return;
+      var text = ids.map(function (id) { var k = state.apiKeys[id]; return envNameOf(k) + '=' + k.key; }).join('\n') + '\n';
+      copyText(text).then(function () {
+        setAkMsg(ak.toolMsg, 'Copied ' + ids.length + ' key' + (ids.length === 1 ? '' : 's') + ' as .env lines.', 'ok');
+      }, function () { setAkMsg(ak.toolMsg, 'Copy was blocked by the browser.', 'error'); });
+    });
+    ak.list.addEventListener('click', function (e) {
+      var btn = e.target.closest('button.mini-btn');
+      if (!btn) return;
+      var id = btn.dataset.id, k = state.apiKeys[id];
+      if (!k) return;
+      if (btn.classList.contains('ak-copy') || btn.classList.contains('ak-copy-env')) {
+        var text = btn.classList.contains('ak-copy') ? k.key : envNameOf(k) + '=' + k.key;
+        copyText(text).then(function () { flash(btn, 'Copied'); }, function () { flash(btn, 'Blocked'); });
+      } else if (btn.classList.contains('ak-edit')) {
+        startKeyEdit(id);
+      } else if (btn.classList.contains('ak-del')) {
+        armOrRun(btn, function () {
+          delete state.apiKeys[id];
+          stamp('ak:' + id);
+          if (akEditing === id) resetKeyForm();
+          save();
+          renderKeys();
+        });
+      }
+    });
+  }
+
+  if (typeof window.STANE_MOVE_PERSONAL_KEYS === 'function') window.STANE_MOVE_PERSONAL_KEYS();
 
   /* ---------------- sync ---------------- */
   var sync = { token: '', personal: false, busy: false, again: false, timer: null };
