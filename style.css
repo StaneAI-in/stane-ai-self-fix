@@ -720,6 +720,7 @@ a.project-link:hover { border-color: var(--accent); }
 .tab[aria-controls="tabPrompts"]::before { content: "📝"; }
 .tab[aria-controls="tabRepos"]::before { content: "💻"; }
 .tab[aria-controls="tabEmployees"]::before { content: "👥"; }
+.tab[aria-controls="tabInsta"]::before { content: "📸"; }
 .tab[aria-controls="tabIdeas"]::before { content: "💡"; }
 .tab[aria-controls="tabExpenses"]::before { content: "💰"; }
 .tab[aria-controls="tabSync"]::before { content: "🔄"; }

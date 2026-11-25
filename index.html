@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=34">
-  <script src="team-key.js?v=34"></script>
-  <script src="auth.js?v=34"></script>
+  <link rel="stylesheet" href="style.css?v=35">
+  <script src="team-key.js?v=35"></script>
+  <script src="auth.js?v=35"></script>
 </head>
 <body>
   <header class="top">
@@ -42,6 +42,7 @@
     <button type="button" role="tab" id="tabBtnPrompts" aria-controls="tabPrompts" aria-selected="false" class="tab">Prompts</button>
     <button type="button" role="tab" id="tabBtnRepos" aria-controls="tabRepos" aria-selected="false" class="tab">GitHub</button>
     <button type="button" role="tab" id="tabBtnEmployees" aria-controls="tabEmployees" aria-selected="false" class="tab">Employees</button>
+    <button type="button" role="tab" id="tabBtnInsta" aria-controls="tabInsta" aria-selected="false" class="tab">Instagram reference</button>
     <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
@@ -493,8 +494,12 @@
         <label>Title
           <input type="text" id="pmTitle" maxlength="120" placeholder="e.g. App store description writer" required>
         </label>
+        <label>Markdown file (optional)
+          <input type="file" id="pmFile" accept=".md,.markdown,.txt,text/markdown,text/plain">
+        </label>
+        <p class="hint pm-file-hint">Upload a .md file to fill the prompt below. An empty title is taken from the file.</p>
         <label>Prompt
-          <textarea id="pmText" rows="8" maxlength="20000" required></textarea>
+          <textarea id="pmText" rows="8" maxlength="100000" required></textarea>
         </label>
         <label>Category (optional)
           <input type="text" id="pmGroup" maxlength="60" placeholder="Coding, Marketing, Design…" list="pmGroupList">
@@ -572,6 +577,42 @@
       </div>
       <ul class="row-groups" id="ghList"></ul>
       <p class="empty" id="ghEmpty">No repositories saved yet.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Instagram reference content (shared) ===================== -->
+  <main class="layout split-layout" id="tabInsta" role="tabpanel" aria-labelledby="tabBtnInsta" hidden>
+    <section class="card" aria-label="Add an Instagram reference">
+      <h2 id="igHead">Add Instagram reference</h2>
+      <p class="hint">Paste the reel or post link and pick a category. Shared by both of you.</p>
+      <form id="igForm" class="video-form" autocomplete="off">
+        <label>Instagram link
+          <input type="text" id="igUrl" maxlength="500" placeholder="https://www.instagram.com/reel/…" required spellcheck="false">
+        </label>
+        <label>Category
+          <select id="igGroup"></select>
+        </label>
+        <label id="igNewWrap" hidden>New category name
+          <input type="text" id="igNew" maxlength="40" placeholder="e.g. Product demo">
+        </label>
+        <div class="form-row">
+          <button type="submit" class="primary-btn" id="igSave">Save link</button>
+          <button type="button" class="ghost-btn" id="igCancel" hidden>Cancel edit</button>
+          <span class="form-msg" id="igMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <section class="card" aria-label="Saved Instagram references">
+      <div class="card-head">
+        <h2>Instagram reference content</h2>
+        <span class="count-pill"><strong id="igCount">0</strong> saved</span>
+      </div>
+      <div class="ak-tools">
+        <input type="search" id="igSearch" placeholder="Search links…" aria-label="Search Instagram links">
+        <select id="igFilter" aria-label="Filter by category"></select>
+      </div>
+      <ul class="row-groups" id="igList"></ul>
+      <p class="empty" id="igEmpty">No Instagram links saved yet.</p>
     </section>
   </main>
 
@@ -770,7 +811,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=34"></script>
-  <script src="team.js?v=34"></script>
+  <script src="app.js?v=35"></script>
+  <script src="team.js?v=35"></script>
 </body>
 </html>

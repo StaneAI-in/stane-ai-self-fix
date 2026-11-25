@@ -93,7 +93,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'instaRefs', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -204,7 +204,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees', ig: 'instaRefs' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -2122,9 +2122,48 @@
       card.appendChild(pre);
       if (p.note) card.appendChild(para('ak-note', p.note));
     },
-    detailButtons: function (id) { return [miniBtn('pm-copy primary-mini', 'Copy prompt', id)]; },
-    onDetail: function (btn, id, p) { if (btn.classList.contains('pm-copy')) copyWithFlash(btn, p.text); }
+    detailButtons: function (id) {
+      return [miniBtn('pm-copy primary-mini', 'Copy prompt', id), miniBtn('pm-download', 'Download .md', id)];
+    },
+    onDetail: function (btn, id, p) {
+      if (btn.classList.contains('pm-copy')) copyWithFlash(btn, p.text);
+      else if (btn.classList.contains('pm-download')) downloadText(mdFileName(p.title), p.text);
+    }
   });
+  // "My prompt: v2!" -> "My-prompt-v2.md"
+  function mdFileName(title) {
+    var base = textOf(title).trim().replace(/[\\/:*?"<>|#%&{}$!'`@+=]+/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      .replace(/^[-.]+|[-.]+$/g, '').slice(0, 80);
+    return (base || 'prompt') + '.md';
+  }
+  // Title for an uploaded file: its first "# Heading", else the file name without the extension.
+  function mdTitle(text, fileName) {
+    var h = /^\s*#{1,6}\s+(.+?)\s*#*\s*$/m.exec(textOf(text).split(/\r?\n/).slice(0, 20).join('\n'));
+    if (h) return h[1].slice(0, 120);
+    return textOf(fileName).replace(/\.(md|markdown|txt)$/i, '').replace(/[-_]+/g, ' ').trim().slice(0, 120);
+  }
+  function downloadText(name, text) {
+    var blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  if ($('pmFile')) {
+    $('pmFile').addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      if (file.size > 100000) { setAkMsg($('pmMsg'), 'That file is too big (100 KB max).', 'error'); this.value = ''; return; }
+      file.text().then(function (text) {
+        $('pmText').value = text;
+        if (!$('pmTitle').value.trim()) $('pmTitle').value = mdTitle(text, file.name);
+        setAkMsg($('pmMsg'), 'Loaded ' + file.name + '. Check it and press Save.', '');
+      }, function () { setAkMsg($('pmMsg'), 'Could not read that file.', 'error'); });
+    });
+  }
 
   /* ----- GitHub repos ----- */
   // Suggested categories for repos that make Claude more capable; any other name works too.
@@ -2341,10 +2380,134 @@
     onDetail: function (btn) { if (btn.classList.contains('emp-copy')) copyWithFlash(btn, btn.dataset.value); }
   });
 
+  /* ----- Instagram reference content ----- */
+  // Only a link and a category. Categories are picked from a list; "+ New category…" adds one,
+  // and every category already used shows up in the list from then on.
+  var IG_CATS = ['Reels ideas', 'Hooks', 'Editing style', 'Carousel posts', 'Captions', 'Covers & thumbnails',
+    'Trending audio', 'AI & tech', 'Product & app promo', 'Talking head', 'Memes & fun', 'Ads', 'Other'];
+  var IG_NEW = '__new__';
+  // Accepts instagram.com / instagr.am links (with or without https://) and drops tracking like ?igsh=.
+  // Returns { url, kind, code } or null when it is not an Instagram link.
+  function parseInsta(input) {
+    var s = textOf(input).trim();
+    if (!s) return null;
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+    var u;
+    try { u = new URL(s); } catch (e) { return null; }
+    if (!/^(www\.|m\.)?(instagram\.com|instagr\.am)$/i.test(u.hostname)) return null;
+    var parts = u.pathname.split('/').filter(Boolean);
+    if (!parts.length) return null;
+    var kinds = { reel: 'Reel', reels: 'Reel', p: 'Post', tv: 'Video', stories: 'Story' };
+    // "/username/reel/CODE" is the same reel as "/reel/CODE".
+    var at = parts.length > 2 && kinds[parts[1]] ? 1 : 0;
+    if (kinds[parts[at]] && parts[at + 1]) {
+      var k = kinds[parts[at]];
+      if (k === 'Story') return { url: 'https://www.instagram.com/' + parts.join('/') + '/', kind: k, code: '@' + parts[at + 1] };
+      var seg = k === 'Reel' ? 'reel' : parts[at];
+      return { url: 'https://www.instagram.com/' + seg + '/' + parts[at + 1] + '/', kind: k, code: parts[at + 1] };
+    }
+    return { url: 'https://www.instagram.com/' + parts[0] + '/', kind: 'Profile', code: '@' + parts[0] };
+  }
+  function igCat(r) { return textOf(r.group).trim() || 'Other'; }
+  function igOrder(names) {
+    return names.slice().sort(function (a, b) {
+      var ia = IG_CATS.indexOf(a), ib = IG_CATS.indexOf(b);
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      return a.localeCompare(b);
+    });
+  }
+  function igFillSelect() {
+    var sel = $('igGroup');
+    if (!sel || document.activeElement === sel) return;
+    var chosen = sel.value;
+    var all = IG_CATS.slice();
+    groupsOf('instaRefs', 'group').forEach(function (g) { if (all.indexOf(g) === -1) all.push(g); });
+    sel.textContent = '';
+    igOrder(all).concat([IG_NEW]).forEach(function (g) {
+      var o = document.createElement('option');
+      o.value = g;
+      o.textContent = g === IG_NEW ? '+ New category…' : g;
+      sel.appendChild(o);
+    });
+    if (chosen && all.concat([IG_NEW]).indexOf(chosen) !== -1) sel.value = chosen;
+    igShowNew();
+  }
+  function igShowNew() {
+    var sel = $('igGroup'), wrap = $('igNewWrap'), input = $('igNew');
+    if (!sel || !wrap || !input) return;
+    var on = sel.value === IG_NEW;
+    wrap.hidden = !on;
+    input.required = on;
+    if (!on) input.value = '';
+  }
+  var instaRefs = makeList({
+    part: 'instaRefs', prefix: 'ig', emptyText: 'No Instagram links saved yet. Use "+ Add link".',
+    ids: { form: 'igForm', head: 'igHead', save: 'igSave', cancel: 'igCancel', msg: 'igMsg', list: 'igList',
+      empty: 'igEmpty', count: 'igCount', search: 'igSearch', filter: 'igFilter' },
+    fields: { igUrl: 'url', igGroup: 'group', igNew: 'newGroup' },
+    required: ['url'],
+    titles: { add: 'Add Instagram reference', save: 'Save link', edit: function (r) { return 'Edit: ' + r.kind + ' ' + r.code; } },
+    read: function (v, old, id) {
+      var r = parseInsta(v.url);
+      if (!r) return 'Paste an Instagram link (instagram.com/…).';
+      var group = v.group === IG_NEW ? v.newGroup.replace(/\s+/g, ' ').slice(0, 40) : v.group;
+      if (!group) return 'Type a name for the new category.';
+      var dupe = Object.keys(state.instaRefs).filter(function (x) { return x !== id && state.instaRefs[x].url === r.url; })[0];
+      if (dupe) return 'This link is already saved under "' + igCat(state.instaRefs[dupe]) + '".';
+      return { url: r.url, kind: r.kind, code: r.code, group: group };
+    },
+    matches: function (r, q, f) {
+      if (f && igCat(r) !== f) return false;
+      return !q || hay(r, ['url', 'kind', 'code', 'group']).indexOf(q) !== -1;
+    },
+    // Newest first inside each category.
+    sort: function (a, b) { return (b.created || 0) - (a.created || 0); },
+    group: igCat,
+    groupOrder: igOrder,
+    groupTools: function (g, ids) {
+      var all = miniBtn('ig-copy-cat', 'Copy all links', '', 'Copy all ' + g + ' links');
+      all.dataset.ids = ids.join(',');
+      return [all];
+    },
+    onGroupTool: function (btn) {
+      var ids = (btn.dataset.ids || '').split(',').filter(function (id) { return state.instaRefs[id]; });
+      if (ids.length) copyWithFlash(btn, ids.map(function (id) { return state.instaRefs[id].url; }).join('\n') + '\n');
+    },
+    renderExtra: function (f) {
+      var used = Object.keys(state.instaRefs).map(function (id) { return igCat(state.instaRefs[id]); })
+        .filter(function (g, i, a) { return a.indexOf(g) === i; });
+      fillGroupFilter(f.filter, 'All categories', igOrder(used));
+      igFillSelect();
+    },
+    row: function (b, id, r) { rowText(b, r.kind + ' · ' + r.code, '', []); },
+    detail: function (card, id, r) {
+      detailHead(card, r.kind + ' · ' + r.code, '', [pill(igCat(r))]);
+      var dl = document.createElement('dl');
+      dl.className = 'emp-dl';
+      detailRow(dl, 'Link', r.url.replace(/^https:\/\/www\./, ''), r.url, true);
+      card.appendChild(dl);
+    },
+    detailButtons: function (id) {
+      return [miniBtn('ig-open primary-mini', 'Open on Instagram', id), miniBtn('ig-copy', 'Copy link', id)];
+    },
+    onDetail: function (btn, id, r) {
+      if (btn.classList.contains('ig-open')) window.open(r.url, '_blank', 'noopener');
+      else if (btn.classList.contains('ig-copy')) copyWithFlash(btn, r.url);
+    }
+  });
+  if ($('igGroup')) {
+    $('igGroup').addEventListener('change', function () { igShowNew(); if (!$('igNewWrap').hidden) $('igNew').focus(); });
+    // A save or "Cancel edit" resets the form; hide the new-category box again.
+    $('igForm').addEventListener('reset', function () { setTimeout(igShowNew, 0); });
+  }
+
   function renderCollections() {
     prompts.render();
     repos.render();
     employees.render();
+    instaRefs.render();
     drawDetail(false);
   }
 
@@ -2365,6 +2528,7 @@
     popForm({ form: 'pmForm', tab: 'tabPrompts', whole: true, host: headOf('tabPrompts'), label: 'Add prompt' });
     popForm({ form: 'ghForm', tab: 'tabRepos', whole: true, host: headOf('tabRepos'), label: 'Add repo' });
     popForm({ form: 'emForm', tab: 'tabEmployees', whole: true, host: headOf('tabEmployees'), label: 'Add employee' });
+    popForm({ form: 'igForm', tab: 'tabInsta', whole: true, host: headOf('tabInsta'), label: 'Add link' });
     popForm({ form: 'tmDocForm', tab: 'tabDocs', whole: true, host: headOf('tabDocs'), label: 'Add document' });
     popForm({ form: 'tmLinkForm', tab: 'tabLinks', title: 'Add a link', extra: ['tmLinkMsg'], host: headOf('tabLinks'), label: 'Add link' });
     popForm({ form: 'mmDocForm', tab: 'tabPartnerDocs', title: 'Add to Mohit Mummy Docs', host: headNear('mmDocForm'), label: 'Add' });
