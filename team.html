@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=36">
-  <script src="team-key.js?v=36"></script>
-  <script src="auth.js?v=36"></script>
+  <link rel="stylesheet" href="style.css?v=37">
+  <script src="team-key.js?v=37"></script>
+  <script src="auth.js?v=37"></script>
 </head>
 <body data-role="member">
   <header class="top">
@@ -605,6 +605,10 @@
           <label>What for
             <input type="text" id="tmExpWhat" maxlength="120" placeholder="e.g. Domain renewal, lunch, ads" required>
           </label>
+          <label>Bill / receipt (optional)
+            <input type="file" id="tmExpFile" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+          </label>
+          <p class="hint">Upload the bill as a PDF or image. If you skip it, the app makes a receipt for you.</p>
           <div class="field-row">
             <label>Paid by
               <select id="tmExpPaidBy">
@@ -660,6 +664,6 @@
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
     })();
   </script>
-  <script src="team.js?v=36"></script>
+  <script src="team.js?v=37"></script>
 </body>
 </html>

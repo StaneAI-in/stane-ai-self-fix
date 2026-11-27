@@ -37,7 +37,7 @@
     ideaInput: { admin: $('tmIdeaInputAdmin'), member: $('tmIdeaInputMember') },
     ideaCat: { admin: $('tmIdeaCatAdmin'), member: $('tmIdeaCatMember') },
     ideaRemind: { admin: $('tmIdeaRemindAdmin'), member: $('tmIdeaRemindMember') },
-    expForm: $('tmExpForm'), expAmount: $('tmExpAmount'), expWhat: $('tmExpWhat'), expDate: $('tmExpDate'),
+    expForm: $('tmExpForm'), expAmount: $('tmExpAmount'), expWhat: $('tmExpWhat'), expDate: $('tmExpDate'), expFile: $('tmExpFile'),
     expPaidBy: $('tmExpPaidBy'), expSplit: $('tmExpSplit'), expMsg: $('tmExpMsg'),
     expBalance: $('tmExpBalance'), expBalanceSub: $('tmExpBalanceSub'), expMonth: $('tmExpMonth'),
     expMonthTitle: $('tmExpMonthTitle'), expPrev: $('tmExpPrev'), expNext: $('tmExpNext'),
@@ -1046,12 +1046,18 @@
       amt.textContent = money(x.amount);
       li.appendChild(body);
       li.appendChild(amt);
-      var pdfBtn = miniBtn('exp-receipt', 'PDF', id, 'Download receipt as PDF: ' + x.what);
-      pdfBtn.dataset.format = 'pdf';
-      var pngBtn = miniBtn('exp-receipt', 'PNG', id, 'Download receipt as image: ' + x.what);
-      pngBtn.dataset.format = 'png';
-      li.appendChild(pdfBtn);
-      li.appendChild(pngBtn);
+      if (x.receipt && x.receipt.path) {
+        // An uploaded bill replaces the generated receipt.
+        var isPdf = /pdf/i.test(x.receipt.mime || '') || /\.pdf$/i.test(x.receipt.name || '');
+        li.appendChild(miniBtn('exp-bill', isPdf ? 'Bill PDF' : 'Bill image', id, 'Download uploaded bill: ' + x.what));
+      } else {
+        var pdfBtn = miniBtn('exp-receipt', 'PDF', id, 'Download receipt as PDF: ' + x.what);
+        pdfBtn.dataset.format = 'pdf';
+        var pngBtn = miniBtn('exp-receipt', 'PNG', id, 'Download receipt as image: ' + x.what);
+        pngBtn.dataset.format = 'png';
+        li.appendChild(pdfBtn);
+        li.appendChild(pngBtn);
+      }
       if (x.by === ROLE || ROLE === 'admin') {
         var del = document.createElement('button');
         del.type = 'button';
@@ -3211,6 +3217,38 @@
   });
 
   /* ---------------- events: expenses ---------------- */
+  var BILL_TYPE = /^(application\/pdf|image\/(png|jpeg|webp))$/i;
+  var BILL_EXT = /\.(pdf|png|jpe?g|webp)$/i;
+  async function downloadBill(btn) {
+    var x = state.expenses[btn.dataset.id];
+    if (!x || !x.receipt) return;
+    var label = btn.textContent;
+    if (!sync.token) { btn.textContent = 'Sign in first'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Downloading…';
+    try {
+      var res = await filesFetch(x.receipt.path, { raw: true });
+      if (!res.ok) throw new Error(res.status);
+      var blob = await res.blob();
+      if (x.receipt.mime) blob = new Blob([blob], { type: x.receipt.mime });
+      saveBlob(x.receipt.name || 'bill', blob);
+      btn.textContent = label;
+    } catch (err) {
+      btn.textContent = 'Failed, try again';
+    }
+    btn.disabled = false;
+  }
+  // Remove a file from the private data repo; if this fails the file just stays there.
+  async function removeStoredFile(path, message) {
+    if (!sync.token) return;
+    try {
+      var info = await filesFetch(path);
+      if (info.ok) {
+        var j = await info.json();
+        await filesFetch(path, { method: 'DELETE', body: { message: message, sha: j.sha } });
+      }
+    } catch (err) { /* ignore */ }
+  }
   function setExpMsg(text, kind) {
     if (!el.expMsg) return;
     el.expMsg.textContent = text;
@@ -3229,7 +3267,7 @@
     el.expPaidBy.addEventListener('change', renderExpenses);
     el.expPrev.addEventListener('click', function () { shiftExpMonth(-1); });
     el.expNext.addEventListener('click', function () { shiftExpMonth(1); });
-    el.expForm.addEventListener('submit', function (e) {
+    el.expForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       var amount = Math.round(parseFloat(el.expAmount.value) * 100);
       var what = el.expWhat.value.trim();
@@ -3239,15 +3277,39 @@
       if (!date) { setExpMsg('Choose a date.', 'error'); return; }
       var split = el.expSplit.value;
       var id = newId();
+      var file = el.expFile && el.expFile.files && el.expFile.files[0];
+      var receipt = null;
+      if (file) {
+        if (!BILL_TYPE.test(file.type || '') && !BILL_EXT.test(file.name)) { setExpMsg('The bill must be a PDF or an image (PNG, JPG, WEBP).', 'error'); return; }
+        if (file.size > DOC_MAX) { setExpMsg('The bill can be up to 10 MB.', 'error'); return; }
+        if (!sync.token) { setExpMsg('Sign in with sync turned on to upload a bill.', 'error'); return; }
+        var safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80) || 'bill';
+        var path = 'receipts/' + id + '/' + safeName;
+        var btn = el.expForm.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        setExpMsg('Uploading bill…');
+        try {
+          var res = await filesFetch(path, { method: 'PUT', body: { message: 'Add expense bill', content: await readAsBase64(file) } });
+          if (!res.ok) throw new Error(res.status === 413 || res.status === 422 ? 'GitHub refused the file (too big or not allowed).' : 'Upload failed (' + res.status + ').');
+        } catch (err) {
+          if (btn) btn.disabled = false;
+          setExpMsg(err instanceof TypeError ? 'Could not reach GitHub. Check the internet connection.' : err.message, 'error');
+          return;
+        }
+        if (btn) btn.disabled = false;
+        receipt = { path: path, name: file.name.slice(0, 120), size: file.size, mime: file.type || '' };
+      }
       state.expenses[id] = {
         amount: amount, what: what, date: date,
         paidBy: el.expPaidBy.value === 'member' ? 'member' : 'admin',
         split: SPLITS.indexOf(split) !== -1 ? split : 'half',
         by: ROLE, created: Date.now()
       };
+      if (receipt) state.expenses[id].receipt = receipt;
       stamp('x:' + id);
       el.expAmount.value = '';
       el.expWhat.value = '';
+      if (el.expFile) el.expFile.value = '';
       expView = date.slice(0, 7);
       save();
       render();
@@ -3257,6 +3319,8 @@
     el.expList.addEventListener('click', function (e) {
       var rc = e.target.closest('.exp-receipt');
       if (rc) { downloadReceipt(rc.dataset.id, rc.dataset.format); return; }
+      var bill = e.target.closest('.exp-bill');
+      if (bill) { downloadBill(bill); return; }
       var del = e.target.closest('.del');
       if (!del) return;
       var id = del.closest('li').dataset.id;
@@ -3267,6 +3331,7 @@
         stamp('x:' + id);
         save();
         render();
+        if (x.receipt && x.receipt.path) removeStoredFile(x.receipt.path, 'Delete expense bill');
       });
     });
   }
