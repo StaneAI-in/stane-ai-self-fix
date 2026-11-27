@@ -792,9 +792,16 @@
 
   /* ---------------- render: expenses ---------------- */
   // How much of an expense the payer covered for the other person.
+  // Partners decided: Divyanshu (admin) carries 60%, Mohit (member) 40%.
+  var PARTNER_SHARE = { admin: 60, member: 40 };
+  var SPLITS = ['half', 'partners', 'payer', 'other', 'settle'];
   function owedToPayer(x) {
     if (x.split === 'payer') return 0;
     if (x.split === 'other' || x.split === 'settle') return x.amount;
+    if (x.split === 'partners') {
+      var other = x.paidBy === 'admin' ? 'member' : 'admin';
+      return Math.round(x.amount * PARTNER_SHARE[other] / 100);
+    }
     return Math.round(x.amount / 2);
   }
   function splitLabel(x) {
@@ -802,7 +809,122 @@
     if (x.split === 'payer') return 'Only for ' + nameOf(x.paidBy);
     if (x.split === 'other') return 'Fully for ' + nameOf(other);
     if (x.split === 'settle') return 'Paid back to ' + nameOf(other);
+    if (x.split === 'partners') return 'Partners decided (' + nameOf('admin') + ' ' + PARTNER_SHARE.admin + '% · ' +
+      nameOf('member') + ' ' + PARTNER_SHARE.member + '%)';
     return 'Split equally';
+  }
+  // Each person's share of an expense, in paise (sums exactly to the amount).
+  function sharesOf(x) {
+    var payer = x.paidBy, other = payer === 'admin' ? 'member' : 'admin';
+    var s = {};
+    s[other] = x.split === 'settle' ? 0 : owedToPayer(x);
+    s[payer] = x.split === 'settle' ? 0 : x.amount - s[other];
+    return s;
+  }
+
+  /* ----- downloadable receipt (PNG) for one expense ----- */
+  var receiptLogo = null;
+  function loadReceiptLogo() {
+    if (receiptLogo) return receiptLogo;
+    receiptLogo = new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { resolve(null); };
+      img.src = 'logo-icon.png';
+    });
+    return receiptLogo;
+  }
+  function longDate(key) {
+    var p = String(key || '').split('-');
+    if (p.length !== 3) return key || '';
+    return Number(p[2]) + ' ' + LONG_MONTHS[Number(p[1]) - 1] + ' ' + p[0];
+  }
+  function receiptNo(id, x) {
+    return 'STN-' + String(x.date || '').replace(/-/g, '') + '-' + String(id).slice(-5).toUpperCase();
+  }
+  function receiptRows(id, x) {
+    var rows = [
+      ['Receipt no.', receiptNo(id, x)],
+      ['Date', longDate(x.date)],
+      ['What for', x.what],
+      ['Paid by', nameOf(x.paidBy)],
+      ['How it is split', splitLabel(x)]
+    ];
+    if (x.split !== 'settle') {
+      var s = sharesOf(x);
+      rows.push([nameOf('admin') + "'s share", money(s.admin)]);
+      rows.push([nameOf('member') + "'s share", money(s.member)]);
+    }
+    rows.push(['Added by', nameOf(x.by) + (x.created ? ' · ' + shortStamp(x.created) : '')]);
+    return rows;
+  }
+  function wrapLines(ctx, text, maxW) {
+    var words = String(text).split(/\s+/), lines = [], line = '';
+    words.forEach(function (w) {
+      var t = line ? line + ' ' + w : w;
+      if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+    });
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
+  }
+  function downloadReceipt(id) {
+    var x = state.expenses[id];
+    if (!x) return;
+    loadReceiptLogo().then(function (logo) {
+      var W = 800, pad = 56, scale = 2, font = '"Instrument Sans", system-ui, sans-serif';
+      var rows = receiptRows(id, x);
+      var cv = document.createElement('canvas');
+      var ctx = cv.getContext('2d');
+      ctx.font = '500 22px ' + font;
+      var valW = W - pad * 2 - 230;
+      var wrapped = rows.map(function (r) { return wrapLines(ctx, r[1], valW); });
+      var bodyH = wrapped.reduce(function (h, l) { return h + l.length * 30 + 22; }, 0);
+      var H = 300 + bodyH + 120;
+      cv.width = W * scale; cv.height = H * scale;
+      ctx.scale(scale, scale);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#4f46e5'; ctx.fillRect(0, 0, W, 8);
+      var y = 56;
+      if (logo) ctx.drawImage(logo, pad, y, 52, 52);
+      ctx.fillStyle = '#111827'; ctx.textBaseline = 'middle';
+      ctx.font = '700 28px ' + font;
+      ctx.fillText('Stane AI', pad + (logo ? 68 : 0), y + 18);
+      ctx.font = '400 18px ' + font; ctx.fillStyle = '#6b7280';
+      ctx.fillText(x.split === 'settle' ? 'Repayment receipt' : 'Expense receipt', pad + (logo ? 68 : 0), y + 44);
+      ctx.textAlign = 'right'; ctx.font = '700 34px ' + font; ctx.fillStyle = '#111827';
+      ctx.fillText(money(x.amount), W - pad, y + 26);
+      ctx.textAlign = 'left';
+      y = 160;
+      ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+      y += 36;
+      ctx.textBaseline = 'alphabetic';
+      rows.forEach(function (r, i) {
+        ctx.font = '400 20px ' + font; ctx.fillStyle = '#6b7280';
+        ctx.fillText(r[0], pad, y);
+        ctx.font = '500 22px ' + font; ctx.fillStyle = '#111827';
+        wrapped[i].forEach(function (line, j) { ctx.fillText(line, pad + 230, y + j * 30); });
+        y += wrapped[i].length * 30 + 22;
+      });
+      y += 10;
+      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+      y += 44;
+      ctx.font = '700 24px ' + font; ctx.fillStyle = '#111827';
+      ctx.fillText('Total', pad, y);
+      ctx.textAlign = 'right'; ctx.fillText(money(x.amount), W - pad, y); ctx.textAlign = 'left';
+      ctx.font = '400 15px ' + font; ctx.fillStyle = '#9ca3af';
+      ctx.fillText('Generated ' + shortStamp(Date.now()) + ' from the Stane AI team app.', pad, H - 36);
+      cv.toBlob(function (blob) {
+        if (!blob) return;
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'Receipt-' + receiptNo(id, x) + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }, 'image/png');
+    });
   }
 
   var expView = todayKey().slice(0, 7);
@@ -815,10 +937,13 @@
     }
     if (el.expSplit) {
       var payer = el.expPaidBy ? el.expPaidBy.value : ROLE;
-      el.expSplit.options[1].textContent = 'Only for ' + nameOf(payer) + ' (personal)';
+      var opt = function (v) { return el.expSplit.querySelector('option[value="' + v + '"]') || {}; };
+      opt('partners').textContent = 'Partners decided (' + nameOf('admin') + ' ' + PARTNER_SHARE.admin + '% · ' +
+        nameOf('member') + ' ' + PARTNER_SHARE.member + '%)';
+      opt('payer').textContent = 'Only for ' + nameOf(payer) + ' (personal)';
       var payee = nameOf(payer === 'admin' ? 'member' : 'admin');
-      el.expSplit.options[2].textContent = 'Fully for ' + payee;
-      el.expSplit.options[3].textContent = 'Paying back money owed to ' + payee;
+      opt('other').textContent = 'Fully for ' + payee;
+      opt('settle').textContent = 'Paying back money owed to ' + payee;
     }
 
     var ids = Object.keys(state.expenses);
@@ -879,6 +1004,7 @@
       amt.textContent = money(x.amount);
       li.appendChild(body);
       li.appendChild(amt);
+      li.appendChild(miniBtn('exp-receipt', 'Receipt', id, 'Download receipt: ' + x.what));
       if (x.by === ROLE || ROLE === 'admin') {
         var del = document.createElement('button');
         del.type = 'button';
@@ -3035,7 +3161,7 @@
       state.expenses[id] = {
         amount: amount, what: what, date: date,
         paidBy: el.expPaidBy.value === 'member' ? 'member' : 'admin',
-        split: split === 'payer' || split === 'other' || split === 'settle' ? split : 'half',
+        split: SPLITS.indexOf(split) !== -1 ? split : 'half',
         by: ROLE, created: Date.now()
       };
       stamp('x:' + id);
@@ -3048,6 +3174,8 @@
       el.expAmount.focus();
     });
     el.expList.addEventListener('click', function (e) {
+      var rc = e.target.closest('.exp-receipt');
+      if (rc) { downloadReceipt(rc.dataset.id); return; }
       var del = e.target.closest('.del');
       if (!del) return;
       var id = del.closest('li').dataset.id;
