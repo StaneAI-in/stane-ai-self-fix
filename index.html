@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=35">
-  <script src="team-key.js?v=35"></script>
-  <script src="auth.js?v=35"></script>
+  <link rel="stylesheet" href="style.css?v=36">
+  <script src="team-key.js?v=36"></script>
+  <script src="auth.js?v=36"></script>
 </head>
 <body>
   <header class="top">
@@ -498,6 +498,7 @@
           <input type="file" id="pmFile" accept=".md,.markdown,.txt,text/markdown,text/plain">
         </label>
         <p class="hint pm-file-hint">Upload a .md file to fill the prompt below. An empty title is taken from the file.</p>
+        <input type="hidden" id="pmSource">
         <label>Prompt
           <textarea id="pmText" rows="8" maxlength="100000" required></textarea>
         </label>
@@ -524,7 +525,7 @@
         <input type="search" id="pmSearch" placeholder="Search prompts…" aria-label="Search prompts">
         <select id="pmFilter" aria-label="Filter by category"></select>
       </div>
-      <ul class="row-list" id="pmList"></ul>
+      <ul class="row-groups" id="pmList"></ul>
       <p class="empty" id="pmEmpty">No prompts saved yet.</p>
     </section>
   </main>
@@ -812,7 +813,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=35"></script>
-  <script src="team.js?v=35"></script>
+  <script src="app.js?v=36"></script>
+  <script src="team.js?v=36"></script>
 </body>
 </html>

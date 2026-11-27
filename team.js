@@ -2272,23 +2272,49 @@
     part: 'prompts', prefix: 'pm', emptyText: 'No prompts saved yet. Use "+ Add prompt".',
     ids: { form: 'pmForm', head: 'pmHead', save: 'pmSave', cancel: 'pmCancel', msg: 'pmMsg', list: 'pmList',
       empty: 'pmEmpty', count: 'pmCount', search: 'pmSearch', filter: 'pmFilter' },
-    fields: { pmTitle: 'title', pmText: 'text', pmGroup: 'group', pmNote: 'note' },
+    fields: { pmTitle: 'title', pmText: 'text', pmGroup: 'group', pmNote: 'note', pmSource: 'source' },
     required: ['title', 'text'],
     titles: { add: 'Add a prompt', save: 'Save prompt', edit: function (p) { return 'Edit: ' + p.title; } },
-    read: function (v) { return { title: v.title, text: v.text, group: v.group, note: v.note }; },
-    matches: function (p, q, f) {
-      if (f && textOf(p.group) !== f) return false;
-      return !q || hay(p, ['title', 'text', 'group', 'note']).indexOf(q) !== -1;
+    read: function (v) {
+      var p = { title: v.title, text: v.text, group: v.group, note: v.note };
+      if (v.source) p.source = v.source;
+      return p;
     },
-    sort: function (a, b) { return textOf(a.title).localeCompare(textOf(b.title)); },
+    matches: function (p, q, f) {
+      if (f && pmCat(p) !== f) return false;
+      return !q || hay(p, ['title', 'text', 'group', 'note', 'source']).indexOf(q) !== -1;
+    },
+    // Numeric order, so "2 …" comes before "10 …" and template sets read 01 -> 20.
+    sort: function (a, b) { return textOf(a.title).localeCompare(textOf(b.title), undefined, { numeric: true }); },
+    group: pmCat,
+    groupOrder: function (names) {
+      return names.sort(function (a, b) { return a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b); });
+    },
+    // Whole category as one output: every prompt in order, joined into one text / one .md file.
+    groupTools: function (g, ids) {
+      var copy = miniBtn('pm-copy-cat', 'Copy all', '', 'Copy all ' + g + ' prompts as one text');
+      var dl = miniBtn('pm-dl-cat', 'Download all .md', '', 'Download all ' + g + ' prompts as one file');
+      copy.dataset.ids = dl.dataset.ids = ids.join(',');
+      dl.dataset.cat = g;
+      return [copy, dl];
+    },
+    onGroupTool: function (btn) {
+      var ids = (btn.dataset.ids || '').split(',').filter(function (id) { return state.prompts[id]; });
+      if (!ids.length) return;
+      var text = joinPrompts(ids.map(function (id) { return state.prompts[id]; }));
+      if (btn.classList.contains('pm-copy-cat')) copyWithFlash(btn, text);
+      else if (btn.classList.contains('pm-dl-cat')) downloadText(mdFileName(btn.dataset.cat), text);
+    },
     renderExtra: function (f) {
       var g = groupsOf('prompts', 'group');
-      fillGroupFilter(f.filter, 'All categories', g);
+      var shown = g.slice();
+      if (Object.keys(state.prompts).some(function (id) { return !textOf(state.prompts[id].group).trim(); })) shown.push('Other');
+      fillGroupFilter(f.filter, 'All categories', shown);
       fillDatalist($('pmGroupList'), g);
     },
-    row: function (b, id, p) { rowText(b, p.title, '', p.group ? [pill(p.group)] : []); },
+    row: function (b, id, p) { rowText(b, p.title, '', []); },
     detail: function (card, id, p) {
-      detailHead(card, p.title, '', p.group ? [pill(p.group)] : []);
+      detailHead(card, p.title, p.source ? 'Source: ' + p.source : '', [pill(pmCat(p))]);
       var pre = document.createElement('pre');
       pre.className = 'pm-text open';
       pre.textContent = p.text;
@@ -2303,6 +2329,11 @@
       else if (btn.classList.contains('pm-download')) downloadText(mdFileName(p.title), p.text);
     }
   });
+  function pmCat(p) { return textOf(p.group).trim() || 'Other'; }
+  // Several prompts as one text, each ending with exactly one blank line before the next.
+  function joinPrompts(list) {
+    return list.map(function (p) { return textOf(p.text).replace(/\s+$/, ''); }).join('\n\n') + '\n';
+  }
   // "My prompt: v2!" -> "My-prompt-v2.md"
   function mdFileName(title) {
     var base = textOf(title).trim().replace(/[\\/:*?"<>|#%&{}$!'`@+=]+/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
@@ -2333,9 +2364,12 @@
       file.text().then(function (text) {
         $('pmText').value = text;
         if (!$('pmTitle').value.trim()) $('pmTitle').value = mdTitle(text, file.name);
+        $('pmSource').value = file.name;
         setAkMsg($('pmMsg'), 'Loaded ' + file.name + '. Check it and press Save.', '');
       }, function () { setAkMsg($('pmMsg'), 'Could not read that file.', 'error'); });
     });
+    // A hidden field keeps its value through form.reset(), so clear it by hand.
+    $('pmForm').addEventListener('reset', function () { $('pmSource').value = ''; });
   }
 
   /* ----- GitHub repos ----- */
