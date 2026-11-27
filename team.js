@@ -867,7 +867,7 @@
     if (line) lines.push(line);
     return lines.length ? lines : [''];
   }
-  function downloadReceipt(id) {
+  function downloadReceipt(id, format) {
     var x = state.expenses[id];
     if (!x) return;
     loadReceiptLogo().then(function (logo) {
@@ -914,17 +914,59 @@
       ctx.textAlign = 'right'; ctx.fillText(money(x.amount), W - pad, y); ctx.textAlign = 'left';
       ctx.font = '400 15px ' + font; ctx.fillStyle = '#9ca3af';
       ctx.fillText('Generated ' + shortStamp(Date.now()) + ' from the Stane AI team app.', pad, H - 36);
-      cv.toBlob(function (blob) {
-        if (!blob) return;
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'Receipt-' + receiptNo(id, x) + '.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      }, 'image/png');
+      var name = 'Receipt-' + receiptNo(id, x);
+      if (format === 'pdf') {
+        cv.toBlob(function (jpg) {
+          if (!jpg) return;
+          jpg.arrayBuffer().then(function (buf) {
+            saveBlob(name + '.pdf', jpegToPdf(new Uint8Array(buf), cv.width, cv.height, W, H));
+          });
+        }, 'image/jpeg', 0.95);
+      } else {
+        cv.toBlob(function (blob) { if (blob) saveBlob(name + '.png', blob); }, 'image/png');
+      }
     });
+  }
+  function saveBlob(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  // A one-page PDF holding a JPEG image (pxW x pxH pixels) drawn at ptW x ptH points.
+  // Hand-built so no PDF library is needed; JPEG goes in as-is via DCTDecode.
+  function jpegToPdf(jpg, pxW, pxH, ptW, ptH) {
+    var enc = function (s) {
+      var b = new Uint8Array(s.length);
+      for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255;
+      return b;
+    };
+    var draw = 'q ' + ptW + ' 0 0 ' + ptH + ' 0 0 cm /Im0 Do Q';
+    var objs = [
+      ['<< /Type /Catalog /Pages 2 0 R >>'],
+      ['<< /Type /Pages /Kids [3 0 R] /Count 1 >>'],
+      ['<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + ptW + ' ' + ptH + '] ' +
+        '/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'],
+      ['<< /Type /XObject /Subtype /Image /Width ' + pxW + ' /Height ' + pxH +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n', jpg, '\nendstream'],
+      ['<< /Length ' + draw.length + ' >>\nstream\n' + draw + '\nendstream']
+    ];
+    var parts = [enc('%PDF-1.4\n')], offset = 9, offsets = [];
+    objs.forEach(function (o, i) {
+      offsets.push(offset);
+      var chunk = [enc((i + 1) + ' 0 obj\n')];
+      o.forEach(function (p) { chunk.push(typeof p === 'string' ? enc(p) : p); });
+      chunk.push(enc('\nendobj\n'));
+      chunk.forEach(function (c) { parts.push(c); offset += c.length; });
+    });
+    var xref = 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n' +
+      offsets.map(function (n) { return ('000000000' + n).slice(-10) + ' 00000 n \n'; }).join('') +
+      'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + offset + '\n%%EOF\n';
+    parts.push(enc(xref));
+    return new Blob(parts, { type: 'application/pdf' });
   }
 
   var expView = todayKey().slice(0, 7);
@@ -1004,7 +1046,12 @@
       amt.textContent = money(x.amount);
       li.appendChild(body);
       li.appendChild(amt);
-      li.appendChild(miniBtn('exp-receipt', 'Receipt', id, 'Download receipt: ' + x.what));
+      var pdfBtn = miniBtn('exp-receipt', 'PDF', id, 'Download receipt as PDF: ' + x.what);
+      pdfBtn.dataset.format = 'pdf';
+      var pngBtn = miniBtn('exp-receipt', 'PNG', id, 'Download receipt as image: ' + x.what);
+      pngBtn.dataset.format = 'png';
+      li.appendChild(pdfBtn);
+      li.appendChild(pngBtn);
       if (x.by === ROLE || ROLE === 'admin') {
         var del = document.createElement('button');
         del.type = 'button';
@@ -3175,7 +3222,7 @@
     });
     el.expList.addEventListener('click', function (e) {
       var rc = e.target.closest('.exp-receipt');
-      if (rc) { downloadReceipt(rc.dataset.id); return; }
+      if (rc) { downloadReceipt(rc.dataset.id, rc.dataset.format); return; }
       var del = e.target.closest('.del');
       if (!del) return;
       var id = del.closest('li').dataset.id;
