@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=40">
-  <script src="team-key.js?v=40"></script>
-  <script src="auth.js?v=40"></script>
+  <link rel="stylesheet" href="style.css?v=41">
+  <script src="team-key.js?v=41"></script>
+  <script src="auth.js?v=41"></script>
 </head>
 <body>
   <header class="top">
@@ -29,7 +29,7 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tabBtnTeam" aria-controls="tabTeam" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" id="tabBtnBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
-    <button type="button" role="tab" id="tabBtnProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Projects</button>
+    <button type="button" role="tab" id="tabBtnProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Company projects</button>
     <button type="button" role="tab" id="tabBtnLinks" aria-controls="tabLinks" aria-selected="false" class="tab">Company links</button>
     <button type="button" role="tab" id="tabBtnDocs" aria-controls="tabDocs" aria-selected="false" class="tab">Company documents</button>
     <button type="button" role="tab" id="tabBtnPartnerDocs" aria-controls="tabPartnerDocs" aria-selected="false" class="tab">Partners documents</button>
@@ -263,20 +263,44 @@
       <button type="button" data-view="list" class="active" aria-pressed="true">Projects</button>
       <button type="button" data-view="tasks" aria-pressed="false">Project tasks</button>
     </div>
-    <section class="card board-add" id="tmProjAddCard" aria-label="Projects">
-      <div class="card-head">
-        <h2>Projects</h2>
-        <span class="count-pill"><strong id="tmProjCount">0</strong> projects</span>
-      </div>
-      <p class="hint" id="tmProjHint">Every project with its direct link. Open "Project tasks" to see and add tasks under each project.</p>
-      <form id="tmProjForm" class="add board-form" autocomplete="off">
-        <input type="text" id="tmProjName" maxlength="80" placeholder="New project name" aria-label="New project name" required>
-        <input type="text" id="tmProjNote" maxlength="1000" placeholder="Description (optional)" aria-label="Description (optional)">
-        <button type="submit">Add project</button>
-      </form>
-    </section>
-    <div class="projects-grid" id="tmProjList"></div>
-    <p class="empty" id="tmProjEmpty">No projects yet.</p>
+    <div class="proj-sec company">
+      <section class="card board-add proj-sec-head" id="tmProjAddCard" aria-label="Company projects">
+        <div class="card-head">
+          <span class="proj-sec-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"/></svg></span>
+          <div class="proj-sec-title">
+            <h2>Company projects</h2>
+            <p class="hint" id="tmProjHint">Websites, tools and products the company runs. Each one with its direct link.</p>
+          </div>
+          <span class="count-pill"><strong id="tmProjCount">0</strong> projects</span>
+        </div>
+        <form id="tmProjForm" class="add board-form" autocomplete="off">
+          <input type="text" id="tmProjName" maxlength="80" placeholder="New company project name" aria-label="New company project name" required>
+          <input type="text" id="tmProjNote" maxlength="1000" placeholder="Description (optional)" aria-label="Description (optional)">
+          <button type="submit">Add project</button>
+        </form>
+      </section>
+      <div class="projects-grid" id="tmProjList"></div>
+      <p class="empty" id="tmProjEmpty">No company projects yet.</p>
+    </div>
+    <div class="proj-sec app">
+      <section class="card board-add proj-sec-head" id="tmAppAddCard" aria-label="App projects">
+        <div class="card-head">
+          <span class="proj-sec-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5zM11 18.5h2"/></svg></span>
+          <div class="proj-sec-title">
+            <h2>App projects</h2>
+            <p class="hint" id="tmAppHint">Mobile and web apps being built, each with its repo and live link.</p>
+          </div>
+          <span class="count-pill"><strong id="tmAppCount">0</strong> apps</span>
+        </div>
+        <form id="tmAppForm" class="add board-form" autocomplete="off">
+          <input type="text" id="tmAppName" maxlength="80" placeholder="New app name" aria-label="New app name" required>
+          <input type="text" id="tmAppNote" maxlength="1000" placeholder="Description (optional)" aria-label="Description (optional)">
+          <button type="submit">Add app</button>
+        </form>
+      </section>
+      <div class="projects-grid" id="tmAppList"></div>
+      <p class="empty" id="tmAppEmpty">No app projects yet. Use "+ Add app".</p>
+    </div>
   </main>
 
   <!-- ===================== Company links ===================== -->
@@ -825,7 +849,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=40"></script>
-  <script src="team.js?v=40"></script>
+  <script src="app.js?v=41"></script>
+  <script src="team.js?v=41"></script>
 </body>
 </html>

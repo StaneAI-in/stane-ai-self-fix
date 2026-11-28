@@ -50,7 +50,9 @@
     boardEmpty: { todo: $('tmBoardTodoEmpty'), doing: $('tmBoardDoingEmpty'), done: $('tmBoardDoneEmpty') },
     projForm: $('tmProjForm'), projName: $('tmProjName'), projNote: $('tmProjNote'),
     projList: $('tmProjList'), projEmpty: $('tmProjEmpty'), projCount: $('tmProjCount'),
-    projView: $('tmProjView'), projHint: $('tmProjHint')
+    projView: $('tmProjView'), projHint: $('tmProjHint'),
+    appForm: $('tmAppForm'), appName: $('tmAppName'), appNote: $('tmAppNote'),
+    appList: $('tmAppList'), appEmpty: $('tmAppEmpty'), appCount: $('tmAppCount')
   };
   if (!el.mine) return;
 
@@ -1308,6 +1310,18 @@
       form.appendChild(detailField(pid, p, 'tag', 'Type', 'input', 'e.g. Desktop app, Web app, Website', 30));
       form.appendChild(detailField(pid, p, 'repo', 'Repository link', 'input', 'https://github.com/…', 300));
       form.appendChild(detailField(pid, p, 'live', 'Live link', 'input', 'https://…', 300));
+      var kindLab = document.createElement('label');
+      kindLab.textContent = 'Section';
+      var kindSel = document.createElement('select');
+      kindSel.name = 'kind';
+      [['company', 'Company projects'], ['app', 'App projects']].forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = o[0]; opt.textContent = o[1];
+        kindSel.appendChild(opt);
+      });
+      kindSel.value = isAppProject(p) ? 'app' : 'company';
+      kindLab.appendChild(kindSel);
+      form.appendChild(kindLab);
       var row = document.createElement('div');
       row.className = 'form-row';
       var saveBtn = document.createElement('button');
@@ -1381,6 +1395,8 @@
   var projView = 'list';
   try { if (localStorage.getItem(PROJ_VIEW_KEY) === 'tasks') projView = 'tasks'; } catch (e) { /* default */ }
   function projectUrl(p) { return safeUrl(p.live) || safeUrl(p.repo); }
+  // Projects are split into "Company projects" and "App projects" by p.kind ('app' or missing).
+  function isAppProject(p) { return p && p.kind === 'app'; }
   function renderProjects() {
     if (!el.projList) return;
     var tasksView = projView === 'tasks';
@@ -1389,16 +1405,21 @@
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', String(on));
     });
-    if ($('tmProjAddCard')) $('tmProjAddCard').hidden = tasksView;
+    if ($('tabProjects')) $('tabProjects').classList.toggle('proj-tasks-mode', tasksView);
     el.projList.classList.toggle('proj-tasks-view', tasksView);
+    if (el.appList) el.appList.classList.toggle('proj-tasks-view', tasksView);
     var ids = Object.keys(state.projects).sort(function (a, b) {
       return (state.projects[a].created || 0) - (state.projects[b].created || 0);
     });
-    if (el.projCount) el.projCount.textContent = ids.length;
+    var appIds = ids.filter(function (pid) { return isAppProject(state.projects[pid]); });
+    if (el.projCount) el.projCount.textContent = ids.length - appIds.length;
+    if (el.appCount) el.appCount.textContent = appIds.length;
     el.projList.textContent = '';
+    if (el.appList) el.appList.textContent = '';
     var order = { todo: 0, doing: 1, done: 2 };
     ids.forEach(function (pid) {
       var p = state.projects[pid];
+      var target = isAppProject(p) && el.appList ? el.appList : el.projList;
       var card = document.createElement('section');
       card.className = 'card project-card';
       card.dataset.id = pid;
@@ -1441,7 +1462,7 @@
       card.appendChild(head);
       if (!tasksView) {
         card.appendChild(detailsBlock(pid, p));
-        el.projList.appendChild(card);
+        target.appendChild(card);
         return;
       }
 
@@ -1506,9 +1527,10 @@
       form.appendChild(add);
       card.appendChild(form);
 
-      el.projList.appendChild(card);
+      target.appendChild(card);
     });
-    if (el.projEmpty) el.projEmpty.hidden = ids.length > 0;
+    if (el.projEmpty) el.projEmpty.hidden = ids.length - (el.appList ? appIds.length : 0) > 0;
+    if (el.appEmpty) el.appEmpty.hidden = appIds.length > 0;
   }
 
   function render() {
@@ -2894,8 +2916,10 @@
       host: function () { var l = $('tmMineList'); return l && l.closest('section').querySelector('.card-head'); } });
     popForm({ form: 'tmBoardForm', tab: 'tabBoard', whole: true, label: 'Add team task',
       host: function () { return document.querySelector('#tabBoard .board'); }, place: 'before' });
-    popForm({ form: 'tmProjForm', tab: 'tabProjects', title: 'Add a project', label: 'Add project',
+    popForm({ form: 'tmProjForm', tab: 'tabProjects', title: 'Add a company project', label: 'Add project',
       host: function () { var c = $('tmProjAddCard'); return c && c.querySelector('.card-head'); } });
+    popForm({ form: 'tmAppForm', tab: 'tabProjects', title: 'Add an app project', label: 'Add app',
+      host: function () { var c = $('tmAppAddCard'); return c && c.querySelector('.card-head'); } });
     var ideaWho = ROLE === 'admin' ? 'Admin' : 'Member';
     popForm({ form: 'tmIdeaForm' + ideaWho, tab: 'tabIdeas', title: 'Add an idea', label: 'Add idea',
       host: function () { return $('tmIdeaHead' + ideaWho); }, place: 'after' });
@@ -3702,7 +3726,6 @@
       if (!b) return;
       projView = b.dataset.view === 'tasks' ? 'tasks' : 'list';
       try { localStorage.setItem(PROJ_VIEW_KEY, projView); } catch (err) { /* this visit only */ }
-      if (el.projHint) el.projHint.hidden = projView === 'tasks';
       renderProjects();
     });
   }
@@ -3721,8 +3744,24 @@
       el.projName.focus();
     });
   }
-  if (el.projList) {
-    el.projList.addEventListener('submit', function (e) {
+  if (el.appForm) {
+    el.appForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = el.appName.value.trim();
+      if (!name) return;
+      var id = newId();
+      state.projects[id] = { name: name, note: el.appNote.value.trim(), kind: 'app', by: ROLE, created: Date.now() };
+      stamp('p:' + id);
+      el.appName.value = '';
+      el.appNote.value = '';
+      save();
+      render();
+      el.appName.focus();
+    });
+  }
+  [el.projList, el.appList].forEach(function (listEl) {
+    if (!listEl) return;
+    listEl.addEventListener('submit', function (e) {
       var form = e.target;
       if (form.classList.contains('desc-form')) {
         e.preventDefault();
@@ -3736,6 +3775,7 @@
         next.tag = f.tag.value.trim().slice(0, 30);
         next.repo = safeUrl(f.repo.value);
         next.live = safeUrl(f.live.value);
+        if (f.kind && f.kind.value === 'app') next.kind = 'app'; else delete next.kind;
         state.projects[dpid] = next;
         stamp('p:' + dpid);
         delete editingDesc[dpid];
@@ -3758,7 +3798,7 @@
       save();
       render();
     });
-    el.projList.addEventListener('change', function (e) {
+    listEl.addEventListener('change', function (e) {
       if (!e.target.classList.contains('impl-status')) return;
       var iid = e.target.closest('li').dataset.iid;
       var it = state.impl[iid];
@@ -3773,7 +3813,7 @@
       save();
       render();
     });
-    el.projList.addEventListener('click', function (e) {
+    listEl.addEventListener('click', function (e) {
       var descBtn = e.target.closest('.desc-edit, .desc-cancel');
       if (descBtn) {
         var dpid = descBtn.closest('.project-card').dataset.id;
@@ -3812,7 +3852,7 @@
         render();
       });
     });
-  }
+  });
 
   /* ---------------- app credentials (encrypted vault) ---------------- */
   // Every credential is encrypted in the browser (AES-GCM, key from the vault password

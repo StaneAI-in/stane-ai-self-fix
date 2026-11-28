@@ -1348,3 +1348,33 @@ h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; }
   .rp-url { grid-column: 1 / 2; }
   .rp-pick { grid-column: 1 / -1; }
 }
+
+/* ---------- Projects: Company and App sections ---------- */
+.proj-sec { display: flex; flex-direction: column; gap: 16px; --sec: var(--accent); --sec-soft: var(--accent-soft); }
+.proj-sec.app { --sec: var(--streak); --sec-soft: var(--streak-soft); }
+.proj-sec + .proj-sec { margin-top: 18px; padding-top: 26px; border-top: 1px solid var(--line); }
+.proj-sec-head { margin-bottom: 0; border-left: 4px solid var(--sec); }
+.proj-sec-head .card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 0; flex-wrap: wrap; }
+.proj-sec-icon {
+  flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
+  background: var(--sec-soft); color: var(--sec);
+}
+.proj-sec-title { flex: 1 1 220px; min-width: 0; }
+.proj-sec-title h2 { margin: 0; font-size: 1.2rem; }
+.proj-sec-title .hint { margin: 2px 0 0; }
+.proj-sec-head .card-head h2 + .count-pill { margin-right: 0; }
+.proj-sec-head .count-pill strong { color: var(--sec); }
+.proj-sec-head .add-open { margin-left: 0; }
+.proj-sec .project-card { transition: border-color 0.15s ease, transform 0.15s ease; }
+.proj-sec .project-card:hover { border-color: var(--sec); }
+.proj-sec.app .project-tag { background: var(--sec-soft); color: var(--sec); }
+.proj-sec.app .project-name-link { border-bottom-color: var(--sec); }
+.proj-sec.app .project-name-link::after, .proj-sec.app .project-name-link:hover { color: var(--sec); }
+.proj-sec.app .progress-bar { background: var(--sec); }
+.proj-sec > .empty { margin: 0; padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+.proj-tasks-mode .proj-sec-head .hint, .proj-tasks-mode .proj-sec-head .add-open { display: none; }
+@media (max-width: 640px) {
+  .proj-sec-head .card-head { gap: 10px; }
+  .proj-sec-icon { width: 36px; height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { .proj-sec .project-card { transition: none; } }
