@@ -210,6 +210,8 @@
   function renderHeader() {
     el.todayLine.textContent = 'Today is ' + longDate(today);
 
+    // The header stats (days crossed, streaks) were removed from the page.
+    if (!el.statCrossed) return;
     var t = parseKey(today);
     var daysInMonth = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
     var crossed = 0;
