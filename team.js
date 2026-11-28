@@ -2718,7 +2718,8 @@
 
   /* ----- Instagram reel plan (1 to 7 Dec) ----- */
   // Each day has one post and three reel reference slots. A slot holds a link, who it is
-  // allotted to ('admin' or 'member') and whether it is completed ('yes' or 'no').
+  // allotted to ('admin' or 'member'), whether it is completed ('yes' or 'no') and whether the
+  // upload went through ('yes' = successful, 'no' = not successful).
   // Both people see and edit the same plan. Stored one atom per slot.
   var RP_START = '2026-12-01', RP_DAYS = 7;
   var RP_SLOTS = [['post', 'Post'], ['reel1', 'Reel reference 1'], ['reel2', 'Reel reference 2'], ['reel3', 'Reel reference 3']];
@@ -2734,12 +2735,13 @@
   function rpGet(id) {
     var v = state.reelPlan[id] || {};
     var to = v.to || v.by || '';
-    return { url: v.url || '', to: to === 'admin' || to === 'member' ? to : '', done: v.done === 'yes' ? 'yes' : (v.done === 'no' ? 'no' : '') };
+    return { url: v.url || '', to: to === 'admin' || to === 'member' ? to : '', done: rpYesNo(v.done), up: rpYesNo(v.up) };
   }
+  function rpYesNo(x) { return x === 'yes' || x === 'no' ? x : ''; }
   function rpSet(id, patch) {
     var v = rpGet(id);
     Object.keys(patch).forEach(function (k) { v[k] = patch[k]; });
-    if (!v.url && !v.to && !v.done) delete state.reelPlan[id];
+    if (!v.url && !v.to && !v.done && !v.up) delete state.reelPlan[id];
     else state.reelPlan[id] = v;
     stamp('rp:' + id);
     save();
@@ -2798,7 +2800,8 @@
         }
         var toWrap = pick('rp-to', 'Allotted to', [['', 'Select…'], ['admin', ''], ['member', '']]);
         var doneWrap = pick('rp-done', 'Completed', [['', 'Select…'], ['yes', 'Yes'], ['no', 'No']]);
-        var to = toWrap.querySelector('select'), done = doneWrap.querySelector('select');
+        var upWrap = pick('rp-up', 'Uploaded', [['', 'Select…'], ['yes', 'Successful'], ['no', 'Not successful']]);
+        var to = toWrap.querySelector('select'), done = doneWrap.querySelector('select'), up = upWrap.querySelector('select');
         var msg = document.createElement('span');
         msg.className = 'rp-msg';
         msg.setAttribute('role', 'status');
@@ -2813,8 +2816,9 @@
         });
         to.addEventListener('change', function () { rpSet(id, { to: to.value }); });
         done.addEventListener('change', function () { rpSet(id, { done: done.value }); });
+        up.addEventListener('change', function () { rpSet(id, { up: up.value }); });
         row.appendChild(lab); row.appendChild(input); row.appendChild(open);
-        row.appendChild(toWrap); row.appendChild(doneWrap); row.appendChild(msg);
+        row.appendChild(toWrap); row.appendChild(doneWrap); row.appendChild(upWrap); row.appendChild(msg);
         day.appendChild(row);
       });
       host.appendChild(day);
@@ -2827,11 +2831,11 @@
     if (!rpBuilt) buildReelPlan(host);
     var total = 0;
     host.querySelectorAll('.rp-day').forEach(function (day) {
-      var done = 0;
+      var done = 0, uploaded = 0;
       day.querySelectorAll('.rp-row').forEach(function (row) {
         var v = rpGet(row.dataset.id);
         var input = row.querySelector('.rp-url'), open = row.querySelector('.rp-open');
-        var to = row.querySelector('.rp-to select'), dn = row.querySelector('.rp-done select');
+        var to = row.querySelector('.rp-to select'), dn = row.querySelector('.rp-done select'), up = row.querySelector('.rp-up select');
         if (document.activeElement !== input) input.value = v.url || '';
         open.hidden = !v.url;
         if (v.url) open.href = v.url; else open.removeAttribute('href');
@@ -2839,12 +2843,17 @@
         to.options[2].textContent = nameOf('member');
         if (document.activeElement !== to) to.value = v.to;
         if (document.activeElement !== dn) dn.value = v.done;
+        if (document.activeElement !== up) up.value = v.up;
+        row.classList.toggle('up-ok', v.up === 'yes');
+        row.classList.toggle('up-fail', v.up === 'no');
+        if (v.up === 'yes') uploaded++;
         row.classList.toggle('done', v.done === 'yes');
         row.classList.toggle('not-done', v.done === 'no');
         if (v.done === 'yes') done++;
       });
-      day.querySelector('.rp-prog').textContent = done + ' / ' + RP_SLOTS.length + ' done';
-      day.classList.toggle('complete', done === RP_SLOTS.length);
+      day.querySelector('.rp-prog').textContent = done + ' / ' + RP_SLOTS.length + ' completed · ' +
+        uploaded + ' / ' + RP_SLOTS.length + ' uploaded';
+      day.classList.toggle('complete', done === RP_SLOTS.length && uploaded === RP_SLOTS.length);
       total += done;
     });
     if ($('rpCount')) $('rpCount').textContent = total;
@@ -2925,15 +2934,129 @@
   }
   function maybeShowTaskPopup() {
     clearTimeout(popup.timer);
-    if (popup.shown || !user) return;
+    if (popup.shown || !user) { if (!popup.open) maybeShowReelReminder(); return; }
     popup.shown = true;
     try { sessionStorage.setItem(POPUP_KEY, '1'); } catch (e) { /* once per page load then */ }
     if (pendingForMe().length) { popup.open = true; renderTaskPopup(); }
+    else maybeShowReelReminder();
   }
   function closeTaskPopup() {
     popup.open = false;
     if (popup.box) { popup.box.hidden = true; popup.box.textContent = ''; }
     document.documentElement.classList.remove('modal-open');
+    maybeShowReelReminder();
+  }
+
+  /* ----- Instagram reel plan: daily reminder ----- */
+  // On each plan day (1 to 7 Dec) the first time the app opens that day, a popup lists today's
+  // post and reel slots that are not yet completed and uploaded. Shown after the task popup.
+  var REEL_REMIND_KEY = 'stane-reel-reminder';
+  var reelPop = { box: null, shownDay: '' };
+  try { reelPop.shownDay = localStorage.getItem(REEL_REMIND_KEY) || ''; } catch (e) { reelPop.shownDay = ''; }
+  function reelPendingToday(today) {
+    return RP_SLOTS.map(function (sl) { return { slot: sl, id: today + '-' + sl[0], v: rpGet(today + '-' + sl[0]) }; })
+      .filter(function (x) { return !(x.v.done === 'yes' && x.v.up === 'yes'); });
+  }
+  function maybeShowReelReminder() {
+    if (!user || popup.open) return;
+    var today = todayKey();
+    if (reelPop.shownDay === today) return;
+    if (!rpDates().some(function (d) { return d.key === today; })) return;
+    reelPop.shownDay = today;
+    try { localStorage.setItem(REEL_REMIND_KEY, today); } catch (e) { /* once per page load then */ }
+    var items = reelPendingToday(today);
+    if (items.length) showReelReminder(today, items);
+  }
+  function closeReelReminder() {
+    if (reelPop.box) { reelPop.box.hidden = true; reelPop.box.textContent = ''; }
+    document.documentElement.classList.remove('modal-open');
+  }
+  function openReelTab() {
+    var btn = document.querySelector('[data-tab="tabReels"]') || $('tabBtnReels');
+    if (btn) btn.click();
+  }
+  function showReelReminder(today, items) {
+    if (!reelPop.box) {
+      reelPop.box = document.createElement('div');
+      reelPop.box.className = 'plan-shade task-pop-shade';
+      reelPop.box.addEventListener('click', function (e) {
+        if (e.target === reelPop.box || e.target.closest('.task-pop-later')) { closeReelReminder(); return; }
+        if (e.target.closest('.task-pop-open')) { closeReelReminder(); openReelTab(); }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && reelPop.box && !reelPop.box.hidden) closeReelReminder();
+      });
+      document.body.appendChild(reelPop.box);
+    }
+    reelPop.box.textContent = '';
+    reelPop.box.hidden = false;
+    document.documentElement.classList.add('modal-open');
+
+    var card = document.createElement('section');
+    card.className = 'card plan-card task-pop';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'reelPopTitle');
+    var top = document.createElement('div');
+    top.className = 'task-pop-top';
+    var hello = document.createElement('p');
+    hello.className = 'task-pop-hello';
+    hello.textContent = 'Instagram reel plan · ' + shortKey(today);
+    var h = document.createElement('h2');
+    h.id = 'reelPopTitle';
+    h.className = 'task-pop-title';
+    h.textContent = items.length + ' of ' + RP_SLOTS.length + ' still to finish today';
+    var mine = items.filter(function (x) { return x.v.to === ROLE; }).length;
+    top.appendChild(hello);
+    top.appendChild(h);
+    if (mine) {
+      var chips = document.createElement('div');
+      chips.className = 'task-pop-chips';
+      chips.appendChild(pill(mine + ' allotted to you', 'task-pop-chip today'));
+      top.appendChild(chips);
+    }
+    card.appendChild(top);
+
+    var ul = document.createElement('ul');
+    ul.className = 'task-pop-list';
+    items.forEach(function (x) {
+      var li = document.createElement('li');
+      li.className = 'task-pop-item rp-pop-item' + (x.v.to === ROLE ? ' today' : '');
+      var box = document.createElement('div');
+      box.className = 'rp-pop-box';
+      var text = document.createElement('span');
+      text.className = 'task-pop-text';
+      text.textContent = x.slot[1];
+      var meta = document.createElement('span');
+      meta.className = 'task-pop-meta';
+      meta.textContent = [
+        x.v.to ? 'Allotted to ' + nameOf(x.v.to) : 'Not allotted yet',
+        'Completed: ' + (x.v.done === 'yes' ? 'Yes' : 'No'),
+        'Uploaded: ' + (x.v.up === 'yes' ? 'Successful' : x.v.up === 'no' ? 'Not successful' : 'Not yet'),
+        x.v.url ? '' : 'No link yet'
+      ].filter(Boolean).join(' · ');
+      box.appendChild(text);
+      box.appendChild(meta);
+      li.appendChild(box);
+      ul.appendChild(li);
+    });
+    card.appendChild(ul);
+
+    var row = document.createElement('div');
+    row.className = 'task-pop-actions';
+    var later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'ghost-btn task-pop-later';
+    later.textContent = 'Later';
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'primary-btn task-pop-open';
+    go.textContent = 'Open reel plan';
+    row.appendChild(later);
+    row.appendChild(go);
+    card.appendChild(row);
+    reelPop.box.appendChild(card);
+    go.focus();
   }
   function openAssignedTab() {
     var btn = document.querySelector('[data-tab="tabTasks"]') || $('tabBtnTeam');
