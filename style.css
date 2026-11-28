@@ -1353,7 +1353,7 @@ h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; }
 .proj-sec { display: flex; flex-direction: column; gap: 16px; --sec: var(--accent); --sec-soft: var(--accent-soft); }
 .proj-sec.app { --sec: var(--streak); --sec-soft: var(--streak-soft); }
 .proj-sec + .proj-sec { margin-top: 18px; padding-top: 26px; border-top: 1px solid var(--line); }
-.proj-sec-head { margin-bottom: 0; border-left: 4px solid var(--sec); }
+.proj-sec-head { margin-bottom: 0; border-color: color-mix(in srgb, var(--sec) 35%, var(--line)); }
 .proj-sec-head .card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 0; flex-wrap: wrap; }
 .proj-sec-icon {
   flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
