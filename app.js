@@ -523,6 +523,7 @@
      ['repos', $('tabRepos'), $('tabBtnRepos')],
      ['employees', $('tabEmployees'), $('tabBtnEmployees')],
      ['insta', $('tabInsta'), $('tabBtnInsta')],
+     ['reels', $('tabReels'), $('tabBtnReels')],
      ['ideas', $('tabIdeas'), $('tabBtnIdeas')],
      ['expenses', $('tabExpenses'), $('tabBtnExpenses')],
      ['sync', el.tabSync, el.tabBtnSync]].forEach(function (t) {
@@ -751,7 +752,7 @@
   $('tabBtnProjects').addEventListener('click', function () { showTab('projects'); });
   $('tabBtnLinks').addEventListener('click', function () { showTab('links'); });
   $('tabBtnDocs').addEventListener('click', function () { showTab('docs'); });
-  ['partnerDocs', 'keys', 'prompts', 'repos', 'employees', 'insta'].forEach(function (n) {
+  ['partnerDocs', 'keys', 'prompts', 'repos', 'employees', 'insta', 'reels'].forEach(function (n) {
     var b = $('tabBtn' + n.charAt(0).toUpperCase() + n.slice(1));
     if (b) b.addEventListener('click', function () { showTab(n); });
   });

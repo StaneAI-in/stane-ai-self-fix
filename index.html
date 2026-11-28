@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=37">
-  <script src="team-key.js?v=37"></script>
-  <script src="auth.js?v=37"></script>
+  <link rel="stylesheet" href="style.css?v=38">
+  <script src="team-key.js?v=38"></script>
+  <script src="auth.js?v=38"></script>
 </head>
 <body>
   <header class="top">
@@ -43,6 +43,7 @@
     <button type="button" role="tab" id="tabBtnRepos" aria-controls="tabRepos" aria-selected="false" class="tab">GitHub</button>
     <button type="button" role="tab" id="tabBtnEmployees" aria-controls="tabEmployees" aria-selected="false" class="tab">Employees</button>
     <button type="button" role="tab" id="tabBtnInsta" aria-controls="tabInsta" aria-selected="false" class="tab">Instagram reference</button>
+    <button type="button" role="tab" id="tabBtnReels" aria-controls="tabReels" aria-selected="false" class="tab">Instagram reel plan</button>
     <button type="button" role="tab" id="tabBtnIdeas" aria-controls="tabIdeas" aria-selected="false" class="tab">Ideas</button>
     <button type="button" role="tab" id="tabBtnExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <button type="button" role="tab" id="tabBtnSync" aria-controls="tabSync" aria-selected="false" class="tab">Sync</button>
@@ -617,6 +618,18 @@
     </section>
   </main>
 
+  <!-- ===================== Instagram reel plan (shared) ===================== -->
+  <main class="layout one-col" id="tabReels" role="tabpanel" aria-labelledby="tabBtnReels" hidden>
+    <section class="card" aria-label="Instagram reel plan">
+      <div class="card-head">
+        <h2>Instagram reel plan</h2>
+        <span class="count-pill"><strong id="rpCount">0</strong> / 28 done</span>
+      </div>
+      <p class="hint">1 to 7 December: one post and three reel references a day. Paste each link, pick who it is allotted to, and mark it completed. Shared by both of you.</p>
+      <div class="rp-days" id="rpDays"></div>
+    </section>
+  </main>
+
   <!-- ===================== Employees (shared) ===================== -->
   <main class="layout split-layout" id="tabEmployees" role="tabpanel" aria-labelledby="tabBtnEmployees" hidden>
     <section class="card" aria-label="Add an employee">
@@ -817,7 +830,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=37"></script>
-  <script src="team.js?v=37"></script>
+  <script src="app.js?v=38"></script>
+  <script src="team.js?v=38"></script>
 </body>
 </html>

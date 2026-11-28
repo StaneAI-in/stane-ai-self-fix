@@ -93,7 +93,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'instaRefs', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'instaRefs', 'reelPlan', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -204,7 +204,7 @@
 
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees', ig: 'instaRefs' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees', ig: 'instaRefs', rp: 'reelPlan' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -2716,11 +2716,146 @@
     $('igForm').addEventListener('reset', function () { setTimeout(igShowNew, 0); });
   }
 
+  /* ----- Instagram reel plan (1 to 7 Dec) ----- */
+  // Each day has one post and three reel reference slots. A slot holds a link, who it is
+  // allotted to ('admin' or 'member') and whether it is completed ('yes' or 'no').
+  // Both people see and edit the same plan. Stored one atom per slot.
+  var RP_START = '2026-12-01', RP_DAYS = 7;
+  var RP_SLOTS = [['post', 'Post'], ['reel1', 'Reel reference 1'], ['reel2', 'Reel reference 2'], ['reel3', 'Reel reference 3']];
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function rpDates() {
+    var p = RP_START.split('-'), out = [];
+    for (var i = 0; i < RP_DAYS; i++) {
+      var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + i);
+      out.push({ key: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), date: d });
+    }
+    return out;
+  }
+  function rpGet(id) {
+    var v = state.reelPlan[id] || {};
+    var to = v.to || v.by || '';
+    return { url: v.url || '', to: to === 'admin' || to === 'member' ? to : '', done: v.done === 'yes' ? 'yes' : (v.done === 'no' ? 'no' : '') };
+  }
+  function rpSet(id, patch) {
+    var v = rpGet(id);
+    Object.keys(patch).forEach(function (k) { v[k] = patch[k]; });
+    if (!v.url && !v.to && !v.done) delete state.reelPlan[id];
+    else state.reelPlan[id] = v;
+    stamp('rp:' + id);
+    save();
+    renderReelPlan();
+  }
+  var rpBuilt = false;
+  function buildReelPlan(host) {
+    rpBuilt = true;
+    rpDates().forEach(function (d) {
+      var day = document.createElement('section');
+      day.className = 'rp-day';
+      day.dataset.day = d.key;
+      var head = document.createElement('div');
+      head.className = 'rp-day-head';
+      var h = document.createElement('h3');
+      h.textContent = d.date.getDate() + ' ' + MONTHS[d.date.getMonth()] + ' · ' + WEEKDAYS[d.date.getDay()];
+      var prog = document.createElement('span');
+      prog.className = 'count-pill rp-prog';
+      head.appendChild(h); head.appendChild(prog);
+      day.appendChild(head);
+      RP_SLOTS.forEach(function (sl) {
+        var id = d.key + '-' + sl[0];
+        var row = document.createElement('div');
+        row.className = 'rp-row';
+        row.dataset.id = id;
+        var lab = document.createElement('label');
+        lab.className = 'rp-label';
+        lab.textContent = sl[1];
+        lab.htmlFor = 'rpUrl-' + id;
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'rpUrl-' + id;
+        input.className = 'rp-url';
+        input.maxLength = 500;
+        input.spellcheck = false;
+        input.placeholder = sl[0] === 'post' ? 'Post link (instagram.com/p/…)' : 'Reel link (instagram.com/reel/…)';
+        var open = document.createElement('a');
+        open.className = 'mini-btn rp-open';
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.textContent = 'Open';
+        function pick(cls, title, opts) {
+          var wrap = document.createElement('label');
+          wrap.className = 'rp-pick ' + cls;
+          var cap = document.createElement('span');
+          cap.textContent = title;
+          var sel = document.createElement('select');
+          sel.setAttribute('aria-label', title + ', ' + sl[1] + ', ' + h.textContent);
+          opts.forEach(function (o) {
+            var opt = document.createElement('option');
+            opt.value = o[0]; opt.textContent = o[1];
+            sel.appendChild(opt);
+          });
+          wrap.appendChild(cap); wrap.appendChild(sel);
+          return wrap;
+        }
+        var toWrap = pick('rp-to', 'Allotted to', [['', 'Select…'], ['admin', ''], ['member', '']]);
+        var doneWrap = pick('rp-done', 'Completed', [['', 'Select…'], ['yes', 'Yes'], ['no', 'No']]);
+        var to = toWrap.querySelector('select'), done = doneWrap.querySelector('select');
+        var msg = document.createElement('span');
+        msg.className = 'rp-msg';
+        msg.setAttribute('role', 'status');
+        input.addEventListener('change', function () {
+          var v = input.value.trim(), cur = rpGet(id);
+          if (!v) { msg.textContent = ''; rpSet(id, { url: '' }); return; }
+          var r = parseInsta(v);
+          if (!r) { msg.textContent = 'Paste an Instagram link.'; return; }
+          msg.textContent = '';
+          input.value = r.url;
+          if (r.url !== cur.url) rpSet(id, { url: r.url });
+        });
+        to.addEventListener('change', function () { rpSet(id, { to: to.value }); });
+        done.addEventListener('change', function () { rpSet(id, { done: done.value }); });
+        row.appendChild(lab); row.appendChild(input); row.appendChild(open);
+        row.appendChild(toWrap); row.appendChild(doneWrap); row.appendChild(msg);
+        day.appendChild(row);
+      });
+      host.appendChild(day);
+    });
+  }
+  // The rows are built once; each render only refreshes values, so typing is never interrupted.
+  function renderReelPlan() {
+    var host = $('rpDays');
+    if (!host) return;
+    if (!rpBuilt) buildReelPlan(host);
+    var total = 0;
+    host.querySelectorAll('.rp-day').forEach(function (day) {
+      var done = 0;
+      day.querySelectorAll('.rp-row').forEach(function (row) {
+        var v = rpGet(row.dataset.id);
+        var input = row.querySelector('.rp-url'), open = row.querySelector('.rp-open');
+        var to = row.querySelector('.rp-to select'), dn = row.querySelector('.rp-done select');
+        if (document.activeElement !== input) input.value = v.url || '';
+        open.hidden = !v.url;
+        if (v.url) open.href = v.url; else open.removeAttribute('href');
+        to.options[1].textContent = nameOf('admin');
+        to.options[2].textContent = nameOf('member');
+        if (document.activeElement !== to) to.value = v.to;
+        if (document.activeElement !== dn) dn.value = v.done;
+        row.classList.toggle('done', v.done === 'yes');
+        row.classList.toggle('not-done', v.done === 'no');
+        if (v.done === 'yes') done++;
+      });
+      day.querySelector('.rp-prog').textContent = done + ' / ' + RP_SLOTS.length + ' done';
+      day.classList.toggle('complete', done === RP_SLOTS.length);
+      total += done;
+    });
+    if ($('rpCount')) $('rpCount').textContent = total;
+  }
+
   function renderCollections() {
     prompts.render();
     repos.render();
     employees.render();
     instaRefs.render();
+    renderReelPlan();
     drawDetail(false);
   }
 
