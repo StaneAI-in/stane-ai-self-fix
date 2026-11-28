@@ -95,7 +95,7 @@
 
   /* ---------------- state ---------------- */
   var PARTS = ['names', 'tasks', 'done', 'ideas', 'expenses', 'shared', 'sharedStatus',
-    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'instaRefs', 'reelPlan', 'stamps'];
+    'projects', 'impl', 'remarks', 'vault', 'vaultMeta', 'links', 'docs', 'planSteps', 'planNotes', 'apiKeys', 'prompts', 'repos', 'employees', 'instaRefs', 'reelPlan', 'morning', 'morningDone', 'stamps'];
   function normalize(p) {
     var s = {};
     PARTS.forEach(function (k) { s[k] = isObj(p) && isObj(p[k]) ? p[k] : {}; });
@@ -204,9 +204,17 @@
   }
   seedProjects();
 
+  // Morning checklist starts with one task. Seeded with stamp 1, so an edit or delete anywhere wins.
+  var MN_SEED = 'seed-morning-1';
+  if (!state.stamps['mn:' + MN_SEED] && !state.morning[MN_SEED]) {
+    state.morning[MN_SEED] = { text: 'Morning task (first 30 minutes)', by: 'admin', created: 1 };
+    state.stamps['mn:' + MN_SEED] = 1;
+    saveLocal();
+  }
+
   /* ---------------- merge (one atom per item, newest change wins) ---------------- */
   var PREFIX = { n: 'names', t: 'tasks', d: 'done', i: 'ideas', x: 'expenses', s: 'shared', ss: 'sharedStatus',
-    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees', ig: 'instaRefs', rp: 'reelPlan' };
+    p: 'projects', im: 'impl', r: 'remarks', v: 'vault', vm: 'vaultMeta', lk: 'links', dc: 'docs', ps: 'planSteps', pn: 'planNotes', ak: 'apiKeys', pm: 'prompts', gh: 'repos', em: 'employees', ig: 'instaRefs', rp: 'reelPlan', mn: 'morning', md: 'morningDone' };
   function atoms(s) {
     var m = {};
     Object.keys(PREFIX).forEach(function (p) {
@@ -228,6 +236,7 @@
     Object.keys(s.impl).forEach(function (id) { if (!s.projects[s.impl[id].project]) delete s.impl[id]; });
     Object.keys(s.planSteps).forEach(function (id) { if (!s.ideas[s.planSteps[id].idea]) delete s.planSteps[id]; });
     Object.keys(s.planNotes).forEach(function (id) { if (!s.ideas[id]) delete s.planNotes[id]; });
+    if (window.STANE_MORNING) window.STANE_MORNING.prune(s.morningDone, s.morning, todayKey(), 30);
     Object.keys(s.remarks).forEach(function (id) {
       var on = s.remarks[id].on;
       if (!s.tasks[on] && !s.shared[on]) delete s.remarks[id];
@@ -1537,7 +1546,7 @@
     // Lists are rebuilt from scratch, so keep the cursor in a dynamic input that was being typed in.
     var act = document.activeElement;
     var focusKey = act && act.dataset ? act.dataset.draft : '';
-    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderNames(); renderTaskPopup(); setupFormPops();
+    renderTasks(); renderBoard(); renderIdeas(); renderExpenses(); renderProjects(); renderCreds(); renderLinks(); renderDocs(); renderKeys(); renderCollections(); renderMorning(); renderNames(); renderTaskPopup(); setupFormPops();
     if (focusKey) {
       var again = document.querySelector('[data-draft="' + focusKey + '"]');
       if (again && again !== document.activeElement) {
@@ -2880,6 +2889,153 @@
     });
     if ($('rpCount')) $('rpCount').textContent = total;
   }
+
+  /* ----- Morning checklist (first 30 minutes, both people, clears every day) ----- */
+  // Items are shared. Each person ticks only their own box; a tick belongs to one day, so
+  // the next morning everything shows unticked again. Pure logic lives in morning-core.js.
+  var MN = window.STANE_MORNING;
+  var WHO = ['admin', 'member'];
+  function mnToggle(item, on) {
+    var day = todayKey(), id = MN.checkId(day, ROLE, item);
+    if (on) state.morningDone[id] = { day: day, who: ROLE, item: item, at: Date.now() };
+    else delete state.morningDone[id];
+    stamp('md:' + id);
+    save();
+    renderMorning();
+  }
+  function mnRow(id) {
+    var li = document.createElement('li');
+    li.className = 'mn-item';
+    li.dataset.id = id;
+    var text = document.createElement('input');
+    text.type = 'text';
+    text.className = 'mn-text';
+    text.maxLength = 160;
+    text.setAttribute('aria-label', 'Morning task name');
+    text.addEventListener('change', function () {
+      var it = state.morning[id], v = text.value.trim();
+      if (!it) return;
+      if (!v || v === it.text) { text.value = it.text; return; }
+      state.morning[id] = { text: v, by: it.by, created: it.created };
+      stamp('mn:' + id);
+      save();
+      renderMorning();
+    });
+    text.addEventListener('keydown', function (e) { if (e.key === 'Enter') text.blur(); });
+    var checks = document.createElement('span');
+    checks.className = 'mn-checks';
+    WHO.forEach(function (who) {
+      var lab = document.createElement('label');
+      lab.className = 'mn-check' + (who === ROLE ? ' mine' : '');
+      lab.dataset.who = who;
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.disabled = who !== ROLE;
+      if (who === ROLE) box.addEventListener('change', function () { mnToggle(id, box.checked); });
+      var name = document.createElement('span');
+      lab.appendChild(box);
+      lab.appendChild(name);
+      checks.appendChild(lab);
+    });
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete morning task');
+    del.addEventListener('click', function () {
+      armOrRun(del, function () {
+        delete state.morning[id];
+        stamp('mn:' + id);
+        MN.prune(state.morningDone, state.morning, todayKey(), 30);
+        save();
+        renderMorning();
+      });
+    });
+    li.appendChild(text);
+    li.appendChild(checks);
+    li.appendChild(del);
+    return li;
+  }
+  // Rows are kept and only refreshed, so typing in a task name is never interrupted by a sync.
+  function renderMorning() {
+    var list = $('mnList');
+    if (!list || !MN) return;
+    var day = todayKey(), ids = MN.itemIds(state.morning);
+    var p = day.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    $('mnDate').textContent = WEEKDAYS[d.getDay()] + ', ' + shortKey(day);
+    var rows = {};
+    Array.prototype.slice.call(list.children).forEach(function (li) { rows[li.dataset.id] = li; });
+    Object.keys(rows).forEach(function (id) { if (ids.indexOf(id) < 0) rows[id].remove(); });
+    ids.forEach(function (id) {
+      var li = rows[id] || mnRow(id);
+      list.appendChild(li);
+      var text = li.querySelector('.mn-text');
+      if (document.activeElement !== text) text.value = state.morning[id].text;
+      var all = true;
+      li.querySelectorAll('.mn-check').forEach(function (lab) {
+        var who = lab.dataset.who, on = MN.isChecked(state.morningDone, day, who, id);
+        var label = nameOf(who) + (who === ROLE ? ' (you)' : '');
+        var box = lab.querySelector('input');
+        box.checked = on;
+        box.setAttribute('aria-label', label + ' done: ' + state.morning[id].text);
+        lab.querySelector('span').textContent = label;
+        lab.classList.toggle('on', on);
+        if (!on) all = false;
+      });
+      li.classList.toggle('done', all);
+    });
+    $('mnEmpty').hidden = ids.length > 0;
+    var prog = $('mnProgress');
+    prog.textContent = '';
+    if (ids.length) {
+      WHO.forEach(function (who) {
+        var r = MN.progress(state.morning, state.morningDone, day, who);
+        var chip = document.createElement('span');
+        chip.className = 'count-pill mn-pill' + (r.done === r.total ? ' all' : '');
+        chip.textContent = nameOf(who) + ' ' + r.done + ' / ' + r.total;
+        prog.appendChild(chip);
+      });
+    }
+    // Badge on the Morning tab: my unticked tasks today.
+    var tab = document.querySelector('.tab[aria-controls="tabMorning"]');
+    if (tab) {
+      var left = MN.pendingFor(state.morning, state.morningDone, day, ROLE).length;
+      var badge = tab.querySelector('.tab-badge');
+      if (left) {
+        if (!badge) { badge = document.createElement('span'); badge.className = 'tab-badge'; tab.appendChild(badge); }
+        badge.textContent = left;
+      } else if (badge) badge.remove();
+    }
+  }
+  if ($('mnForm')) {
+    $('mnForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = $('mnText').value.trim();
+      if (!v) return;
+      var id = newId();
+      state.morning[id] = { text: v, by: ROLE, created: Date.now() };
+      stamp('mn:' + id);
+      save();
+      $('mnText').value = '';
+      renderMorning();
+    });
+  }
+  // On opening the site, start on Morning while I still have morning tasks left today.
+  var mnOpened = false;
+  function maybeOpenMorning() {
+    if (mnOpened || !MN || !user) return;
+    mnOpened = true;
+    if (!MN.pendingFor(state.morning, state.morningDone, todayKey(), ROLE).length) return;
+    var btn = document.querySelector('.tab[aria-controls="tabMorning"]');
+    if (btn) btn.click();
+  }
+  // A new day can start while the page stays open: re-draw so yesterday's ticks clear.
+  var mnDay = todayKey();
+  setInterval(function () {
+    if (todayKey() === mnDay) return;
+    mnDay = todayKey();
+    renderMorning();
+  }, 60000);
 
   function renderCollections() {
     prompts.render();
@@ -4460,6 +4616,7 @@
 
   if (el.assignDue) el.assignDue.min = todayKey();
   render();
+  maybeOpenMorning();
   syncNow();
 })();
 
@@ -4468,6 +4625,65 @@
   'use strict';
   var nav = document.querySelector('nav.tabs');
   if (!nav) return;
+
+  // Sidebar groups: each group is a dropdown of its tabs. Open/closed is remembered per
+  // browser; the group holding the open tab always opens. Tabs a page doesn't have are skipped.
+  var GROUPS = [
+    ['tasks', 'Tasks', ['tabMorning', 'tabTasks', 'tabTeam', 'tabBoard']],
+    ['company', 'Company things', ['tabProjects', 'tabEmployees', 'tabDocs', 'tabPartnerDocs', 'tabLinks', 'tabExpenses']],
+    ['dev', 'Development', ['tabKeys', 'tabPrompts', 'tabRepos', 'tabIdeas', 'tabSync']],
+    ['social', 'Social', ['tabInsta', 'tabReels']],
+    ['personal', 'Personal', ['tabCalendar', 'tabEnglish']]
+  ];
+  var GROUP_KEY = 'stane-nav-groups';
+  var groupOpen = {};
+  try { groupOpen = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}') || {}; } catch (e) { groupOpen = {}; }
+  var groupFrag = document.createDocumentFragment();
+  GROUPS.forEach(function (g) {
+    var tabs = g[2].map(function (id) { return nav.querySelector('.tab[aria-controls="' + id + '"]'); })
+      .filter(Boolean);
+    if (!tabs.length) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'tab-group';
+    wrap.dataset.group = g[0];
+    var head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'tab-group-head';
+    head.setAttribute('aria-controls', 'navGroup-' + g[0]);
+    var name = document.createElement('span');
+    name.textContent = g[1];
+    var chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.setAttribute('aria-hidden', 'true');
+    chev.textContent = '▾';
+    head.appendChild(name);
+    head.appendChild(chev);
+    var list = document.createElement('div');
+    list.className = 'tab-group-list';
+    list.id = 'navGroup-' + g[0];
+    tabs.forEach(function (t) { list.appendChild(t); });
+    wrap.appendChild(head);
+    wrap.appendChild(list);
+    head.addEventListener('click', function () { setGroup(wrap, list.hidden, true); });
+    setGroup(wrap, g[0] in groupOpen ? !!groupOpen[g[0]] : g[0] === 'tasks', false);
+    groupFrag.appendChild(wrap);
+  });
+  nav.insertBefore(groupFrag, nav.firstChild);
+  function setGroup(wrap, open, remember) {
+    wrap.querySelector('.tab-group-list').hidden = !open;
+    wrap.classList.toggle('closed', !open);
+    wrap.querySelector('.tab-group-head').setAttribute('aria-expanded', String(open));
+    if (!remember) return;
+    groupOpen[wrap.dataset.group] = open;
+    try { localStorage.setItem(GROUP_KEY, JSON.stringify(groupOpen)); } catch (e) { /* not kept */ }
+  }
+  function openActiveGroup() {
+    var active = nav.querySelector('.tab.active');
+    var wrap = active && active.closest('.tab-group');
+    if (wrap && wrap.classList.contains('closed')) setGroup(wrap, true, false);
+  }
+  openActiveGroup();
+
   var bar = document.createElement('div');
   bar.className = 'mobile-bar';
   var menu = document.createElement('button');
@@ -4502,7 +4718,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
   nav.addEventListener('click', function (e) {
     if (!e.target.closest('.tab')) return;
-    setTimeout(function () { updateTitle(); setOpen(false); window.scrollTo(0, 0); }, 0);
+    setTimeout(function () { updateTitle(); openActiveGroup(); setOpen(false); window.scrollTo(0, 0); }, 0);
   });
   updateTitle();
 
@@ -4512,7 +4728,11 @@
   fold.type = 'button';
   fold.className = 'collapse-btn';
   nav.insertBefore(fold, nav.firstChild);
-  nav.querySelectorAll('.tab').forEach(function (t) { t.title = t.textContent.trim(); });
+  nav.querySelectorAll('.tab').forEach(function (t) {
+    var copy = t.cloneNode(true);
+    copy.querySelectorAll('.tab-badge').forEach(function (b) { b.remove(); });
+    t.title = copy.textContent.trim();
+  });
   function setCollapsed(on) {
     document.documentElement.classList.toggle('nav-collapsed', on);
     fold.textContent = on ? '»' : '« Hide menu';

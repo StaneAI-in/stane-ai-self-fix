@@ -1378,3 +1378,66 @@ h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; }
   .proj-sec-icon { width: 36px; height: 36px; }
 }
 @media (prefers-reduced-motion: reduce) { .proj-sec .project-card { transition: none; } }
+
+/* ---------- Sidebar groups (dropdowns) ---------- */
+.tab-group { display: flex; flex-direction: column; gap: 2px; }
+.tab-group + .tab-group { margin-top: 6px; }
+.tab-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: transparent; border: 0; border-radius: 8px;
+  padding: 8px 14px 6px; color: var(--muted);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; text-align: left;
+}
+.tab-group-head:hover { color: var(--text); background: var(--cell); }
+.tab-group-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tab-group-head .chev { font-size: 0.9rem; transition: transform 0.15s ease; }
+.tab-group.closed .tab-group-head .chev { transform: rotate(-90deg); }
+/* A closed group still shows that something inside needs attention. */
+.tab-group.closed:has(.tab-badge) .tab-group-head span:first-child::after {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+  border-radius: 50%; background: var(--cross); vertical-align: middle;
+}
+.tab-group-list { display: flex; flex-direction: column; gap: 2px; }
+.tab-group-list[hidden] { display: none; }
+.tabs .tab-group .tab.tab-mini { font-size: inherit; padding: 10px 14px; color: var(--muted); }
+.tabs .tab-group .tab.tab-mini.active { color: var(--nav-on, var(--accent-text)); }
+.tab[aria-controls="tabMorning"]::before { content: "🌅"; }
+.tab[aria-controls="tabReels"]::before { content: "🎬"; }
+@media (min-width: 900px) {
+  /* Icons-only sidebar: every tab stays visible, group heads become thin dividers. */
+  html.nav-collapsed .tab-group-list[hidden] { display: flex; }
+  html.nav-collapsed .tab-group-head { font-size: 0; padding: 0; height: 1px; margin: 4px 10px; background: var(--line); pointer-events: none; }
+  html.nav-collapsed .tab-group-head .chev { display: none; }
+}
+@media (max-width: 899px) {
+  .tabs .tab-group .tab.tab-mini { padding: 12px 14px; font-size: 1rem; }
+  .tab-group-head { padding: 10px 14px 8px; min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .tab-group-head .chev { transition: none; } }
+
+/* ---------- Morning checklist ---------- */
+.mn-progress { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.mn-pill.all { color: var(--done); border-color: var(--done); }
+.mn-list li.mn-item { flex-wrap: wrap; gap: 8px 12px; }
+.mn-list li.mn-item.done { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); }
+.mn-text {
+  flex: 1 1 220px; min-width: 0; font: inherit; font-weight: 600; color: var(--text);
+  background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px;
+}
+.mn-text:hover { border-color: var(--line); }
+.mn-text:focus { outline: 2px solid var(--accent); outline-offset: 0; background: var(--panel); }
+.mn-item.done .mn-text { text-decoration: line-through; color: var(--muted); }
+.mn-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.mn-check {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); font-size: 0.85rem; color: var(--muted);
+}
+.mn-check.mine { color: var(--text); cursor: pointer; }
+.mn-check.mine:hover { border-color: var(--done); }
+.mn-check.on { border-color: var(--done); color: var(--done); }
+.mn-check input:disabled { cursor: default; opacity: 0.85; }
+.mn-list + .empty + .add { margin-top: 12px; }
+@media (max-width: 640px) {
+  .mn-text { flex-basis: 100%; }
+}

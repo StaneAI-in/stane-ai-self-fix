@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
-  <link rel="stylesheet" href="style.css?v=41">
-  <script src="team-key.js?v=41"></script>
-  <script src="auth.js?v=41"></script>
+  <link rel="stylesheet" href="style.css?v=42">
+  <script src="team-key.js?v=42"></script>
+  <script src="auth.js?v=42"></script>
 </head>
 <body data-role="member">
   <header class="top">
@@ -27,6 +27,7 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" data-tab="tabMorning" aria-controls="tabMorning" aria-selected="false" class="tab">Morning</button>
     <button type="button" role="tab" data-tab="tabTasks" aria-controls="tabTasks" aria-selected="true" class="tab active">Assigned</button>
     <button type="button" role="tab" data-tab="tabBoard" aria-controls="tabBoard" aria-selected="false" class="tab">Team tasks</button>
     <button type="button" role="tab" data-tab="tabProjects" aria-controls="tabProjects" aria-selected="false" class="tab">Company projects</button>
@@ -43,6 +44,24 @@
     <button type="button" role="tab" data-tab="tabExpenses" aria-controls="tabExpenses" aria-selected="false" class="tab">Expenses</button>
     <span class="sync-chip off" id="tmChip">Not connected</span>
   </nav>
+
+  <!-- ===================== Morning (shared, resets every day) ===================== -->
+  <main class="layout one-col" id="tabMorning" role="tabpanel" hidden>
+    <section class="card" aria-label="Morning tasks">
+      <div class="card-head">
+        <h2>Morning &middot; first 30 minutes</h2>
+        <span class="count-pill" id="mnDate"></span>
+      </div>
+      <p class="hint">Both of you do these first thing every morning. Tick your own box when it is done. The ticks clear by themselves the next morning.</p>
+      <div class="mn-progress" id="mnProgress"></div>
+      <ul class="tasks mn-list" id="mnList"></ul>
+      <p class="empty" id="mnEmpty">No morning tasks yet. Add one below.</p>
+      <form id="mnForm" class="add" autocomplete="off">
+        <input type="text" id="mnText" maxlength="160" placeholder="New morning task" aria-label="New morning task" required>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+  </main>
 
   <!-- ===================== Tasks ===================== -->
   <main class="layout" id="tabTasks" role="tabpanel">
@@ -701,6 +720,7 @@
       tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
     })();
   </script>
-  <script src="team.js?v=41"></script>
+  <script src="morning-core.js?v=42"></script>
+  <script src="team.js?v=42"></script>
 </body>
 </html>

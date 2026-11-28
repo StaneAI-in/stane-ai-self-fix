@@ -514,6 +514,7 @@
   function showTab(name) {
     [['calendar', el.tabCalendar, el.tabBtnCalendar],
      ['english', el.tabEnglish, el.tabBtnEnglish],
+     ['morning', $('tabMorning'), $('tabBtnMorning')],
      ['team', $('tabTeam'), $('tabBtnTeam')],
      ['board', $('tabBoard'), $('tabBtnBoard')],
      ['projects', $('tabProjects'), $('tabBtnProjects')],
@@ -754,7 +755,7 @@
   $('tabBtnProjects').addEventListener('click', function () { showTab('projects'); });
   $('tabBtnLinks').addEventListener('click', function () { showTab('links'); });
   $('tabBtnDocs').addEventListener('click', function () { showTab('docs'); });
-  ['partnerDocs', 'keys', 'prompts', 'repos', 'employees', 'insta', 'reels'].forEach(function (n) {
+  ['morning', 'partnerDocs', 'keys', 'prompts', 'repos', 'employees', 'insta', 'reels'].forEach(function (n) {
     var b = $('tabBtn' + n.charAt(0).toUpperCase() + n.slice(1));
     if (b) b.addEventListener('click', function () { showTab(n); });
   });
